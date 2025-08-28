@@ -2,8 +2,8 @@
 Release Notes
 =============
 
-0.8.0 (TBA)
-===========
+0.8.0 (August 28, 2025)
+=======================
 
 - Support NumPy 2.0. [PR `#502`_]
 - Migrate from nose to pytest. [PR `#503`_]
