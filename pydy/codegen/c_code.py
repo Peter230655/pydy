@@ -5,23 +5,8 @@ matrices generated from sympy.physics.mechanics."""
 
 import os
 
-from packaging.version import parse as parse_version
 import sympy as sm
-
-SYMPY_VERSION = sm.__version__
-
-try:
-    try:
-        if parse_version(SYMPY_VERSION) >= parse_version('1.7'):
-            from sympy.printing.c import C99CodePrinter as CCodePrinter
-        else:
-            from sympy.printing.ccode import C99CodePrinter as CCodePrinter
-    except ImportError:
-        # SymPy 1.0 and lower uses this version.
-        from sympy.printing.ccode import CCodePrinter
-except ModuleNotFoundError:
-    # SymPy > 1.5 renamed the module ccode to c
-    from sympy.printing.c import C99CodePrinter as CCodePrinter
+from sympy.printing.c import C99CodePrinter as CCodePrinter
 
 from .matrix_generator import MatrixGenerator
 from ..utils import wrap_and_indent
