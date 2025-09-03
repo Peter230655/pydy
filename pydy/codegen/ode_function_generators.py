@@ -6,6 +6,7 @@ if sys.version_info > (3, 0):
 else:
     from collections import Sequence
 from itertools import chain
+import logging
 
 import numpy as np
 import numpy.linalg
@@ -18,7 +19,7 @@ theano = sm.external.import_module('theano')
 if theano:
     from sympy.printing.theanocode import theano_function
 
-from .c_code import _CLUsolveGenerator
+from .c_code import _CSymbolicLinearSolveGenerator
 from .cython_code import CythonMatrixGenerator
 
 
@@ -239,10 +240,16 @@ r : dictionary
             functions of time and the order does not matter.
         linear_sys_solver : string or function
             Specify either `numpy` or `scipy` to use the linear solvers
-            provided in each package or supply a function that solves a
-            linear system Ax=b with the call signature x = solve(A, b). For
-            example, if you need to use custom kwargs for the SciPy solver,
-            pass in a lambda function that wraps the solver and sets them.
+            provided in each package or supply a function that solves a linear
+            system Ax=b with the call signature x = solve(A, b). For example,
+            if you need to use custom kwargs for the SciPy solver, pass in a
+            lambda function that wraps the solver and sets them. If `sympy` or
+            `sympy:<method>` is provided, the linear system will be solved
+            symbolically in an efficient manner. `<method>` method can be any
+            valid method for
+            :meth:`sympy.matrices.matrixbase.MatrixBase.solve`, such as `LU`,
+            `CH`, or `CRAMER`. The default is `LU` if only `sympy` is provided.
+            The symbolic solve only works with the Cython generator.
         constants_arg_type : string
             The generated function accepts two different types of arguments
             for the numerical values of the constants: either a ndarray of
@@ -279,7 +286,7 @@ r : dictionary
         self.constants_arg_type = constants_arg_type
         self.specifieds_arg_type = specifieds_arg_type
 
-        # As the order of the constants and specifieds arguments if not
+        # As the order of the constants and specifieds arguments is not
         # important, allow Sets to be used as input. However, the order must be
         # maintained and converted to a Sequence.
         if constants is not None and not isinstance(constants, Sequence):
@@ -315,7 +322,7 @@ r : dictionary
 
     @linear_sys_solver.setter
     def linear_sys_solver(self, v):
-
+        logging.debug(f'Linear system solver set to {v}.')
         if isinstance(v, type(lambda x: x)):
             self._solve_linear_system = v
             self._linear_sys_solver = v
@@ -325,10 +332,14 @@ r : dictionary
         elif v == 'scipy':
             self._solve_linear_system = scipy.linalg.solve
             self._linear_sys_solver = v
-        elif v == 'sympy':
+        elif v.startswith('sympy'):
             # dummy function
             self._solve_linear_system = lambda A, b: np.nan*np.ones_like(b)
-            self._linear_sys_solver = v
+            self._linear_sys_solver = 'sympy'
+            if ':' in v:
+                self._sympy_solver = v.split(':')[-1]
+            else:
+                self._sympy_solver = 'LU'
         else:
             msg = '{} is not a valid solver.'
             raise ValueError(msg.format(self.linear_sys_solver))
@@ -662,7 +673,8 @@ class CythonODEFunctionGenerator(ODEFunctionGenerator):
                                   prefix=self._options['prefix'],
                                   cse=True)
         # patch in the special generator
-        g.c_matrix_generator = _CLUsolveGenerator(inputs, outputs)
+        g.c_matrix_generator = _CSymbolicLinearSolveGenerator(
+            inputs, outputs, sympy_solver=self._sympy_solver)
         return g.compile(tmp_dir=self._options['tmp_dir'],
                          verbose=self._options['verbose'])
 
@@ -901,6 +913,12 @@ def generate_ode_function(*args, **kwargs):
                   'theano': TheanoODEFunctionGenerator}
 
     generator = kwargs.pop('generator', 'lambdify')
+
+    lin_solver = kwargs['linear_sys_solver']
+
+    if lin_solver.startswith('sympy') and generator != 'cython':
+        msg = f'{generator} does not support the symbolic linear solver.'
+        raise ValueError(msg)
 
     try:
         # See if user passed in a custom class.
