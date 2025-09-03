@@ -7,6 +7,7 @@ import numpy as np
 import scipy as sp
 import sympy as sm
 from pydy.codegen.ode_function_generators import generate_ode_function
+import pytest
 
 Cython = sm.external.import_module('Cython')
 theano = sm.external.import_module('theano')
@@ -22,18 +23,39 @@ from ...utils import PyDyImportWarning
 warnings.simplefilter('once', PyDyImportWarning)
 
 
-def test_symbolic_lusolve_full_mass_matrix():
+def test_symbolic_linear_solve_full_mass_matrix():
     sys = models.n_link_pendulum_on_cart(n=5, cart_force=False,
                                          joint_torques=False)
 
-    g_symbolic_solve = CythonODEFunctionGenerator(
+    # symbolic solve only works with cython, raises with lambdify or theano
+    with pytest.raises(ValueError):
+        generate_ode_function(
+            sys.eom_method.forcing_full,
+            sys.coordinates,
+            sys.speeds,
+            sys.constants_symbols,
+            mass_matrix=sys.eom_method.mass_matrix_full,
+            linear_sys_solver='sympy',
+            generator='lambdify')
+
+    with pytest.raises(ValueError):
+        generate_ode_function(
+            sys.eom_method.forcing_full,
+            sys.coordinates,
+            sys.speeds,
+            sys.constants_symbols,
+            mass_matrix=sys.eom_method.mass_matrix_full,
+            linear_sys_solver='sympy:BOOGER',
+            generator='cython')
+
+    rhs_symbolic_solve = generate_ode_function(
         sys.eom_method.forcing_full,
         sys.coordinates,
         sys.speeds,
         sys.constants_symbols,
         mass_matrix=sys.eom_method.mass_matrix_full,
-        linear_sys_solver='sympy')
-    rhs_symbolic_solve = g_symbolic_solve.generate()
+        linear_sys_solver='sympy:CH',
+        generator='cython')
 
     g_numeric_solve = CythonODEFunctionGenerator(
         sys.eom_method.forcing_full,
@@ -41,19 +63,18 @@ def test_symbolic_lusolve_full_mass_matrix():
         sys.speeds,
         sys.constants_symbols,
         mass_matrix=sys.eom_method.mass_matrix_full,
-        linear_sys_solver='numpy')
+    )
     rhs_numeric_solve = g_numeric_solve.generate()
 
-    x = np.random.random(g_symbolic_solve.num_coordinates +
-                         g_symbolic_solve.num_speeds)
+    x = np.random.random(len(sys.states))
     t = 5.125
-    p = np.random.random(g_symbolic_solve.num_constants)
+    p = np.random.random(len(sys.constants_symbols))
 
     np.testing.assert_allclose(rhs_numeric_solve(x, t, p),
                                rhs_symbolic_solve(x, t, p))
 
 
-def test_symbolic_lusolve_min_mass_matrix():
+def test_symbolic_linear_solve_min_mass_matrix():
     sys = models.n_link_pendulum_on_cart(n=5, cart_force=False,
                                          joint_torques=False)
     kin_diff_eqs = sys.eom_method.kindiffdict()
@@ -67,7 +88,7 @@ def test_symbolic_lusolve_min_mass_matrix():
         sys.constants_symbols,
         mass_matrix=sys.eom_method.mass_matrix,
         coordinate_derivatives=coord_derivs,
-        linear_sys_solver='sympy')
+        linear_sys_solver='sympy')  # LUsolve by default
     rhs_symbolic_solve = g_symbolic_solve.generate()
 
     g_numeric_solve = CythonODEFunctionGenerator(

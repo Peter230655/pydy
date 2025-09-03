@@ -50,7 +50,7 @@ void evaluate(
     def _generate_code_blocks(self):
         """Writes the blocks of code for the C file."""
 
-        # TODO : This could use the super classes method with some tweaks.
+        # TODO : This could use the super class's method with some tweaks.
 
         printer = self._generate_pydy_printer()()
 
@@ -143,12 +143,35 @@ void evaluate(
             f.write(source)
 
 
-class _CLUsolveGenerator(CMatrixGenerator):
+class _CSymbolicLinearSolveGenerator(CMatrixGenerator):
     """This is a private undocumented class that supports the
-    ``linear_sys_solver='sympy'`` in CythonMatrixGenerator. It cse's A and b of
-    a linear system Ax=b, then solves the linear system symbolically and cse's
-    the result x. This is a more efficient way to get the symbolic solution of
-    a linear system encoded in generated C code."""
+    ``linear_sys_solver='sympy:<method>'`` in CythonMatrixGenerator. It cse's A
+    and b of a linear system Ax=b, then solves the linear system symbolically
+    and cse's the result x. This is a more efficient way to get the symbolic
+    solution of a linear system encoded in generated C code.
+
+    Parameters
+    ==========
+    sympy_solver : string
+        Method used to solve the symbolic linear system of the form ``A*x=b``.
+        This should should be a valid method for the SymPy method
+        :meth:`sympy.matrices.matrixbase.MatrixBase.solve`.  The default is
+        ``'LU'`` which corresponds to SymPy's
+        :meth:`sympy.matrices.matrixbase.MatrixBase.LUsolve`. Some other
+        options are: ``'GJ'`` or ``'GE'`` for Gauss-Jordan elimination,
+        ``'QR'`` for :meth:`sympy.matrices.matrixbase.MatrixBase.QRsolve,
+        ``'PINV'`` for :meth:`sympy.matrices.matrixbase.MatrixBase.pinv_solve,
+        ``'CRAMER'`` for
+        :meth:`sympy.matrices.matrixbase.MatrixBase.cramer_solve`, ``'CH'``,
+        :meth:`sympy.matrices.matrixbase.MatrixBase.cholesky_solve`, and
+        ``'LDL'`` for :meth:`sympy.matrices.matrixbase.MatrixBase.LDLsolve`.
+
+    """
+
+    def __init__(self, arguments, matrices, cse=True, verify_arguments=False,
+                 sympy_solver='LU'):
+        self.sympy_solver=sympy_solver
+        super().__init__(arguments, matrices, cse=True, verify_arguments=False)
 
     def _generate_cse(self, prefix='pydy_'):
         # NOTE : This assumes the first two items in self.matrices are A and b
@@ -160,7 +183,7 @@ class _CLUsolveGenerator(CMatrixGenerator):
         A_simp = mats_simp[0]
         b_simp = mats_simp[1]
 
-        x = A_simp.LUsolve(b_simp)
+        x = sm.Matrix.solve(A_simp, b_simp, method=self.sympy_solver)
 
         gen2 = sm.numbered_symbols(prefix, start=len(subexprs1))
         subexprs2, x_simp = sm.cse(x, symbols=gen2)

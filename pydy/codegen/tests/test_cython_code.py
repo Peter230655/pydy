@@ -6,7 +6,7 @@ import numpy as np
 import sympy as sm
 
 from ...models import multi_mass_spring_damper
-from ..c_code import _CLUsolveGenerator
+from ..c_code import _CSymbolicLinearSolveGenerator
 from ..cython_code import CythonMatrixGenerator
 
 
@@ -223,7 +223,8 @@ def test_lusolve_generator():
 
     generator = CythonMatrixGenerator(arguments, outputs)
     # patch in the special generator
-    generator.c_matrix_generator = _CLUsolveGenerator(arguments, outputs)
+    generator.c_matrix_generator = _CSymbolicLinearSolveGenerator(arguments,
+                                                                  outputs)
     func = generator.compile()
 
     # setup the input and output arrays
