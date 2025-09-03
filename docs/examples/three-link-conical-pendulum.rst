@@ -199,8 +199,9 @@ Simulate the System
    # ODEs can be generated.
    print("Generating numeric right hand side.")
    right_hand_side = generate_ode_function(kane.forcing_full, q, u, param_syms,
-                                          mass_matrix=kane.mass_matrix_full,
-                                          generator='cython')
+                                           mass_matrix=kane.mass_matrix_full,
+                                           generator='cython',
+                                           linear_sys_solver='sympy')
 
    # To simulate the system, a time vector and initial conditions for the
    # system's states is required.
