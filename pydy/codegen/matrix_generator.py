@@ -6,14 +6,12 @@ import sympy as sm
 import sympy.physics.mechanics as me
 from sympy.printing.codeprinter import CodePrinter
 
-from ..utils import wrap_and_indent, find_dynamicsymbols
+from ..utils import wrap_and_indent
 
 
 class MatrixGenerator(object):
     """This abstract base class generates source files that simultaneously
-    numerically evaluate any number of SymPy matrices.
-
-    """
+    numerically evaluate any number of SymPy matrices."""
 
     _idx_start = 0
     _idx_delim = "[]"
@@ -54,7 +52,7 @@ class MatrixGenerator(object):
 
             for matrix in matrices:
                 required_args |= matrix.free_symbols
-                required_args |= find_dynamicsymbols(matrix)
+                required_args |= me.find_dynamicsymbols(matrix)
 
             if me.dynamicsymbols._t in required_args:
                 required_args.remove(me.dynamicsymbols._t)
@@ -181,16 +179,7 @@ class MatrixGenerator(object):
         for i, output in enumerate(self.simplified_matrices):
             nr, nc = output.shape
             lhs = sm.MatrixSymbol('output_{}'.format(i + self._idx_start), nr, nc)
-            try:
-                code_str = printer.doprint(output, lhs)
-            except AttributeError:
-                # The above fails in SymPy 0.7.4.1 because Matrix printing
-                # isn't supported.
-                code_lines = []
-                for j, element in enumerate(output):
-                    assignment = 'output_{}[{}]'.format(i, j)
-                    code_lines.append(printer.doprint(element, assignment))
-                code_str = '\n'.join(code_lines)
+            code_str = printer.doprint(output, lhs)
             outputs += wrap_and_indent(code_str.split('\n'),
                                        continuation=self._line_contin)
             if i != len(self.simplified_matrices) - 1:
