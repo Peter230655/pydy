@@ -86,16 +86,7 @@ void evaluate(
         for i, output in enumerate(self.simplified_matrices):
             nr, nc = output.shape
             lhs = sm.MatrixSymbol('output_{}'.format(i), nr, nc)
-            try:
-                code_str = printer.doprint(output, lhs)
-            except AttributeError:
-                # The above fails in SymPy 0.7.4.1 because Matrix printing
-                # isn't supported.
-                code_lines = []
-                for j, element in enumerate(output):
-                    assignment = 'output_{}[{}]'.format(i, j)
-                    code_lines.append(printer.doprint(element, assignment))
-                code_str = '\n'.join(code_lines)
+            code_str = printer.doprint(output, lhs)
             outputs += wrap_and_indent(code_str.split('\n'))
             if i != len(self.simplified_matrices) - 1:
                 outputs += '\n\n'  # space between each output

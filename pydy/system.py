@@ -53,8 +53,7 @@ from itertools import repeat
 
 import numpy as np
 import sympy as sm
-from sympy.physics.mechanics import dynamicsymbols
-from sympy.physics.mechanics.functions import find_dynamicsymbols
+from sympy.physics.mechanics import dynamicsymbols, find_dynamicsymbols
 from scipy.integrate import odeint
 
 from .codegen.ode_function_generators import generate_ode_function

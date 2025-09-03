@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-if sys.version_info > (3, 0):
-    from collections.abc import Sequence
-else:
-    from collections import Sequence
+from collections.abc import Sequence
 from itertools import chain
 
 import numpy as np
@@ -368,7 +365,7 @@ r : dictionary
         """Returns an array of numerical values from the constants
         dictionary in the correct order."""
 
-        # NOTE : It's unfortunate that this has to be run at every rhs eval,
+        # TODO : It's unfortunate that this has to be run at every rhs eval,
         # because subsequent calls to rhs() doesn't require different
         # constants. I suppose you can sub out all the constants in the EoMs
         # before passing them into the generator. That would beg for the
@@ -747,19 +744,12 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
                 subs[sym] = v[i]
             vec_inputs.append(v)
 
-        try:
-            outputs = [me.msubs(output, subs) for output in outputs]
-        except AttributeError:
-            # msubs doesn't exist in SymPy < 0.7.6.
-            outputs = [output.subs(subs) for output in outputs]
+        outputs = [me.msubs(output, subs) for output in outputs]
 
         modules = [{'ImmutableMatrix': np.array}, 'numpy']
 
-        try:
-            return sm.lambdify(vec_inputs, outputs, modules=modules,
-                               cse=self._options['cse'])
-        except TypeError:  # cse added in SymPy 1.9
-            return sm.lambdify(vec_inputs, outputs, modules=modules)
+        return sm.lambdify(vec_inputs, outputs, modules=modules,
+                           cse=self._options['cse'])
 
     def generate_full_rhs_function(self):
 
