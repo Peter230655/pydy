@@ -914,11 +914,14 @@ def generate_ode_function(*args, **kwargs):
 
     generator = kwargs.pop('generator', 'lambdify')
 
-    lin_solver = kwargs['linear_sys_solver']
-
-    if lin_solver.startswith('sympy') and generator != 'cython':
-        msg = f'{generator} does not support the symbolic linear solver.'
-        raise ValueError(msg)
+    try:
+        lin_solver = kwargs['linear_sys_solver']
+    except KeyError:
+        pass
+    else:
+        if lin_solver.startswith('sympy') and generator != 'cython':
+            msg = f'{generator} does not support the symbolic linear solver.'
+            raise ValueError(msg)
 
     try:
         # See if user passed in a custom class.
