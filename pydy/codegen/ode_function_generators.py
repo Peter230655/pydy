@@ -18,7 +18,7 @@ if theano:
 
 from .c_code import _CSymbolicLinearSolveGenerator
 from .cython_code import CythonMatrixGenerator
-from .utils import sympy_equal_to_or_newer_than
+from ..utils import sympy_equal_to_or_newer_than
 
 
 class ODEFunctionGenerator(object):
