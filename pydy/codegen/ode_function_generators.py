@@ -192,15 +192,15 @@ r : dictionary
 
         where
 
-            x : states, i.e. [q, u]
-            t : time
-            r : specified (exogenous) inputs
-            p : constants
-            q : generalized coordinates
-            u : generalized speeds
-            M : mass matrix (full or minimum)
-            F : right hand side (full or minimum)
-            G : right hand side of the kinematical differential equations
+            - x : states, i.e. [q, u]
+            - t : time
+            - r : specified (exogenous) inputs
+            - p : constants
+            - q : generalized coordinates
+            - u : generalized speeds
+            - M : mass matrix (full or minimum)
+            - F : right hand side (full or minimum)
+            - G : right hand side of the kinematical differential equations
 
         The generated function is of the form F(x, t, p) or F(x, t, r, p)
         depending on whether the system has specified inputs or not.
@@ -640,11 +640,12 @@ class CythonODEFunctionGenerator(ODEFunctionGenerator):
 
     def __init__(self, *args, **kwargs):
 
-        self._options = {'tmp_dir': None,
-                         'prefix': 'pydy_codegen',
-                         'cse': True,
-                         'verbose': False,
-                         }
+        self._options = {
+            'tmp_dir': None,
+            'prefix': 'pydy_codegen',
+            'cse': True,
+            'verbose': False,
+        }
         for k, v in self._options.items():
             self._options[k] = kwargs.pop(k, v)
 
@@ -668,7 +669,7 @@ class CythonODEFunctionGenerator(ODEFunctionGenerator):
             raise ValueError(msg)
         g = CythonMatrixGenerator(inputs, outputs,
                                   prefix=self._options['prefix'],
-                                  cse=True)
+                                  cse=self._options['cse'])
         # patch in the special generator
         g.c_matrix_generator = _CSymbolicLinearSolveGenerator(
             inputs, outputs, sympy_solver=self._sympy_solver)
