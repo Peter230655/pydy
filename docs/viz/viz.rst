@@ -121,3 +121,8 @@ Python
 .. automodule:: pydy.viz.visualization_frame
    :members:
    :special-members: __init__
+
+Javascript
+----------
+
+.. include:: api.rst
