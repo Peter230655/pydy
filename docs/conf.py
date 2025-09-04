@@ -132,7 +132,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'PyDy Distribution'
+project = u'PyDy'
 copyright = u'{}, PyDy Authors'.format(COPYRIGHT_YEARS)
 
 # The version info for the project you're documenting, acts as replacement for
@@ -280,8 +280,8 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'PyDyDistribution.tex', u'PyDy Distribution Documentation',
-   u'PyDy Authors', 'manual'),
+    ('index', 'PyDyDistribution.tex', u'PyDy Distribution Documentation',
+     u'PyDy Authors', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -324,9 +324,9 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'PyDyDistribution', u'PyDy Distribution Documentation',
-   u'PyDy Authors', 'PyDyDistribution', 'One line description of project.',
-   'Miscellaneous'),
+    ('index', 'PyDyDistribution', u'PyDy Distribution Documentation',
+     u'PyDy Authors', 'PyDyDistribution', 'One line description of project.',
+     'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.
