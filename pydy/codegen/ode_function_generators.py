@@ -18,6 +18,7 @@ if theano:
 
 from .c_code import _CSymbolicLinearSolveGenerator
 from .cython_code import CythonMatrixGenerator
+from .utils import sympy_equal_to_or_newer_than
 
 
 class ODEFunctionGenerator(object):
@@ -740,25 +741,26 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
     __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
 
     def _lambdify(self, outputs):
-        # TODO : We could forgo this substitution for generation speed
-        # purposes and have lots of args for lambdify (like it used to be
-        # done) but there may be some limitations on number of args.
-        subs = {}
-        vec_inputs = []
-        if self.specifieds is None:
-            def_vecs = ['q', 'u', 'p']
-        else:
-            def_vecs = ['q', 'u', 'r', 'p']
+        if sympy_equal_to_or_newer_than('1.11.1'):
+            vec_inputs = self.inputs
+            modules = 'numpy'
+        else:  # TODO : remove this clause when SymPy < 1.11.1 is dropped
+            subs = {}
+            vec_inputs = []
+            if self.specifieds is None:
+                def_vecs = ['q', 'u', 'p']
+            else:
+                def_vecs = ['q', 'u', 'r', 'p']
 
-        for syms, vec_name in zip(self.inputs, def_vecs):
-            v = sm.DeferredVector(vec_name)
-            for i, sym in enumerate(syms):
-                subs[sym] = v[i]
-            vec_inputs.append(v)
+            for syms, vec_name in zip(self.inputs, def_vecs):
+                v = sm.DeferredVector(vec_name)
+                for i, sym in enumerate(syms):
+                    subs[sym] = v[i]
+                vec_inputs.append(v)
 
-        outputs = [me.msubs(output, subs) for output in outputs]
+            outputs = [me.msubs(output, subs) for output in outputs]
 
-        modules = [{'ImmutableMatrix': np.array}, 'numpy']
+            modules = [{'ImmutableMatrix': np.array}, 'numpy']
 
         return sm.lambdify(vec_inputs, outputs, modules=modules,
                            cse=self._options['cse'])
