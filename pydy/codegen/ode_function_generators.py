@@ -269,8 +269,7 @@ r : dictionary
             slow down for performance critical code. If you know apriori
             what arg types you want to support choose either ``array``,
             ``function``, or ``dictionary``. The speed of each, from fast to
-            slow, are ``array``, ``function``, ``dictionary``, None.
-
+            slow, are ``array``, ``function``, ``dictionary``, None.\
         """
 
         self.right_hand_side = right_hand_side
@@ -912,7 +911,8 @@ def generate_ode_function(*args, **kwargs):
     except KeyError:
         pass
     else:
-        if lin_solver.startswith('sympy') and generator != 'cython':
+        if (isinstance(lin_solver, str) and lin_solver.startswith('sympy') and
+                generator != 'cython'):
             msg = f'{generator} does not support the symbolic linear solver.'
             raise ValueError(msg)
 
@@ -935,7 +935,7 @@ def generate_ode_function(*args, **kwargs):
 
 _docstr = ODEFunctionGenerator.__init__.__doc__
 _extra_parameters_doc = \
-"""\
+"""
         generator : string or and ODEFunctionGenerator, optional
             The method used for generating the numeric right hand side. The
             string options are {'lambdify'|'theano'|'cython'} with

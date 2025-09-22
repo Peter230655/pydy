@@ -48,6 +48,15 @@ def test_symbolic_linear_solve_full_mass_matrix():
             linear_sys_solver='sympy:BOOGER',
             generator='cython')
 
+    # NOTE : Make sure passing a callable works.
+    generate_ode_function(
+        sys.eom_method.forcing_full,
+        sys.coordinates,
+        sys.speeds,
+        sys.constants_symbols,
+        mass_matrix=sys.eom_method.mass_matrix_full,
+        linear_sys_solver=lambda A, b: np.linalg.solve)
+
     rhs_symbolic_solve = generate_ode_function(
         sys.eom_method.forcing_full,
         sys.coordinates,
