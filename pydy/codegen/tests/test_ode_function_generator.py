@@ -11,12 +11,14 @@ import pytest
 
 Cython = sm.external.import_module('Cython')
 theano = sm.external.import_module('theano')
+symjit = sm.external.import_module('symjit')
 
 from ... import models
 from ..ode_function_generators import (ODEFunctionGenerator,
                                        LambdifyODEFunctionGenerator,
                                        CythonODEFunctionGenerator,
-                                       TheanoODEFunctionGenerator)
+                                       TheanoODEFunctionGenerator,
+                                       SymjitODEFunctionGenerator)
 
 from ...utils import PyDyImportWarning
 
@@ -294,6 +296,12 @@ class TestODEFunctionGeneratorSubclasses(object):
         ode_function_subclasses.append(TheanoODEFunctionGenerator)
     else:
         warnings.warn("Theano was not found so the related tests are being"
+                      " skipped.", PyDyImportWarning)
+
+    if symjit:
+        ode_function_subclasses.append(SymjitODEFunctionGenerator)
+    else:
+        warnings.warn("Symjit was not found so the related tests are being"
                       " skipped.", PyDyImportWarning)
 
     def setup_method(self):

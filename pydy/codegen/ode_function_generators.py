@@ -986,23 +986,24 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
         f = self._symjitify(outputs)
 
-        k_dim = len(self.inputs[0])
-        m_dim = len(self.inputs[0]) + len(self.inputs[1])
+        m_dim = len(self.inputs[1])
 
         if self.specifieds is None:
             def convert_symjit_output(q, u, p):
                 all_vals = np.asarray(f(*np.hstack((q, u, p))))
                 m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + k_dim]
-                k_vals = all_vals[m_dim*m_dim + k_dim:]
+                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + m_dim]
+                k_vals = all_vals[m_dim*m_dim + m_dim:]
                 return m_vals, f_vals, k_vals
         else:
             def convert_symjit_output(q, u, r, p):
                 all_vals = np.asarray(f(*np.hstack((q, u, r, p))))
                 m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + k_dim]
-                k_vals = all_vals[m_dim*m_dim + k_dim:]
+                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + m_dim]
+                k_vals = all_vals[m_dim*m_dim + m_dim:]
                 return m_vals, f_vals, k_vals
+
+        self.eval_arrays = convert_symjit_output
 
 
 def generate_ode_function(*args, **kwargs):
@@ -1047,7 +1048,7 @@ _extra_parameters_doc = \
 """\
         generator : string or and ODEFunctionGenerator, optional
             The method used for generating the numeric right hand side. The
-            string options are {'lambdify'|'theano'|'cython'} with
+            string options are {'lambdify'|'theano'|'cython'|'symjit'} with
             'lambdify' being the default. You can also pass in a custom
             subclass of ODEFunctionGenerator.
 
