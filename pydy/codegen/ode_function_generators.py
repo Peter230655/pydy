@@ -914,19 +914,28 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
     __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
 
     def _symjitify(self, outputs):
-        vec_inputs = self.inputs
+        # NOTE : symjit currently only works with expressions made up of
+        # Symbol() not Function()(Symbol()) so we have to replace all functions
+        # of time with symbols.
         repl = {}
         for seq in self.inputs[:-1]:  # skip p
             for v in seq:
                 repl[v] = sm.Symbol(v.name)  # TODO : apply assumptions
 
+        # NOTE : symjit only accepts an expression or a list of expressions, so
+        # we have to flatten the matrices and make a long list of all
+        # expressions.
         new_outputs = []
         for o in outputs:
             for expr in o:
                 new_outputs.append(expr.xreplace(repl))
 
-        return compile_func(list(repl.values()) + list(self.inputs[-1]),
-                            new_outputs, cse=self._options['cse'])
+        # NOTE : symjit does not allow iterable of iterables as the function
+        # arguments so all symbols in the expression are expanded into one long
+        # list.
+        new_inputs = list(repl.values()) + list(self.inputs[-1])
+
+        return compile_func(new_inputs, new_outputs, cse=self._options['cse'])
 
     def generate_full_rhs_function(self):
 
@@ -935,10 +944,15 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
         f = self._symjitify(outputs)
 
+        # NOTE : symjit outputs a list of floats, not a NumPy array of floats.
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: np.asarray(f(*list(np.hstack((q, u, p)))))
+            def wrapper(q, u, p):
+                return np.asarray(f(*np.hstack((q, u, p))))
         else:
-            self.eval_arrays = lambda q, u, r, p: np.asarray(f(*list(np.hstack((q, u, r, p)))))
+            def wrapper(q, u, r, p):
+                return np.asarray(f(*np.hstack((q, u, r, p))))
+
+        self.eval_arrays = wrapper
 
     def generate_full_mass_matrix_function(self):
 
@@ -950,19 +964,19 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
         m_dim = len(self.inputs[0]) + len(self.inputs[1])
 
         if self.specifieds is None:
-            def convert_symjit_output(q, u, p):
+            def wrapper(q, u, p):
                 all_vals = np.asarray(f(*np.hstack((q, u, p))))
                 m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                 f_vals = all_vals[m_dim*m_dim:]
                 return m_vals, f_vals
         else:
-            def convert_symjit_output(q, u, r, p):
+            def wrapper(q, u, r, p):
                 all_vals = np.asarray(f(*np.hstack((q, u, r, p))))
                 m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                 f_vals = all_vals[m_dim*m_dim:]
                 return m_vals, f_vals
 
-        self.eval_arrays = convert_symjit_output
+        self.eval_arrays = wrapper
 
     def generate_min_mass_matrix_function(self):
 
