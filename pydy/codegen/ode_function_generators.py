@@ -13,8 +13,11 @@ import sympy.physics.mechanics as me
 from sympy.core.function import UndefinedFunction, Derivative
 Cython = sm.external.import_module('Cython')
 theano = sm.external.import_module('theano')
+symjit = sm.external.import_module('symjit')
 if theano:
     from sympy.printing.theanocode import theano_function
+if symjit:
+    from symjit import compile_func
 
 from .c_code import _CSymbolicLinearSolveGenerator
 from .cython_code import CythonMatrixGenerator
@@ -897,13 +900,105 @@ class TheanoODEFunctionGenerator(ODEFunctionGenerator):
         self.eval_arrays = eval_arrays
 
 
+class SymjitODEFunctionGenerator(ODEFunctionGenerator):
+
+    def __init__(self, *args, **kwargs):
+
+        self._options = {'cse': True}
+
+        for k, v in self._options.items():
+            self._options[k] = kwargs.pop(k, v)
+
+        super().__init__(*args, **kwargs)
+
+    __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
+
+    def _symjitify(self, outputs):
+        vec_inputs = self.inputs
+        repl = {}
+        for seq in self.inputs[:-1]:  # skip p
+            for v in seq:
+                repl[v] = sm.Symbol(v.name)  # TODO : apply assumptions
+
+        new_outputs = []
+        for o in outputs:
+            for expr in o:
+                new_outputs.append(expr.xreplace(repl))
+
+        return compile_func(list(repl.values()) + list(self.inputs[-1]),
+                            new_outputs, cse=self._options['cse'])
+
+    def generate_full_rhs_function(self):
+
+        self.define_inputs()
+        outputs = [self.right_hand_side]
+
+        f = self._symjitify(outputs)
+
+        if self.specifieds is None:
+            self.eval_arrays = lambda q, u, p: np.asarray(f(*list(np.hstack((q, u, p)))))
+        else:
+            self.eval_arrays = lambda q, u, r, p: np.asarray(f(*list(np.hstack((q, u, r, p)))))
+
+    def generate_full_mass_matrix_function(self):
+
+        self.define_inputs()
+        outputs = [self.mass_matrix, self.right_hand_side]
+
+        f = self._symjitify(outputs)
+
+        m_dim = len(self.inputs[0]) + len(self.inputs[1])
+
+        if self.specifieds is None:
+            def convert_symjit_output(q, u, p):
+                all_vals = np.asarray(f(*np.hstack((q, u, p))))
+                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                f_vals = all_vals[m_dim*m_dim:]
+                return m_vals, f_vals
+        else:
+            def convert_symjit_output(q, u, r, p):
+                all_vals = np.asarray(f(*np.hstack((q, u, r, p))))
+                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                f_vals = all_vals[m_dim*m_dim:]
+                return m_vals, f_vals
+
+        self.eval_arrays = convert_symjit_output
+
+    def generate_min_mass_matrix_function(self):
+
+        self.define_inputs()
+        outputs = [self.mass_matrix, self.right_hand_side,
+                   self.coordinate_derivatives]
+
+        f = self._symjitify(outputs)
+
+        k_dim = len(self.inputs[0])
+        m_dim = len(self.inputs[0]) + len(self.inputs[1])
+
+        if self.specifieds is None:
+            def convert_symjit_output(q, u, p):
+                all_vals = np.asarray(f(*np.hstack((q, u, p))))
+                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + k_dim]
+                k_vals = all_vals[m_dim*m_dim + k_dim:]
+                return m_vals, f_vals, k_vals
+        else:
+            def convert_symjit_output(q, u, r, p):
+                all_vals = np.asarray(f(*np.hstack((q, u, r, p))))
+                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + k_dim]
+                k_vals = all_vals[m_dim*m_dim + k_dim:]
+                return m_vals, f_vals, k_vals
+
+
 def generate_ode_function(*args, **kwargs):
     """This is a function wrapper to the above classes. The docstring is
     automatically generated below."""
 
     generators = {'lambdify': LambdifyODEFunctionGenerator,
                   'cython': CythonODEFunctionGenerator,
-                  'theano': TheanoODEFunctionGenerator}
+                  'theano': TheanoODEFunctionGenerator,
+                  'symjit': SymjitODEFunctionGenerator}
 
     generator = kwargs.pop('generator', 'lambdify')
 

@@ -25,4 +25,5 @@ dependencies:
   - python=3.*
   - pythreejs
   - sphinx
+  - symjit
   - sympy

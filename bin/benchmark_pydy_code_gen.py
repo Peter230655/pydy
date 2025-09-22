@@ -18,7 +18,7 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
     for each n up to the max number provided and generates a plot of the
     results."""
 
-    methods = ['lambdify', 'cython', 'theano']
+    methods = ['lambdify', 'cython', 'theano', 'symjit']
 
     link_numbers = range(1, max_num_links + 1)
 
