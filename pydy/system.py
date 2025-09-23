@@ -419,7 +419,7 @@ class System(object):
 
         """
 
-        args = (self.eom_method.forcing_full,
+        args = (self.eom_method.forcing,
                 self.coordinates,
                 self.speeds,
                 self.constants_symbols)
@@ -442,8 +442,15 @@ class System(object):
         if not specifieds:
             specifieds = None
 
-        kwargs = {'mass_matrix': self.eom_method.mass_matrix_full,
-                  'specifieds': specifieds}
+        kin_diff_dict = self.eom_method.kindiffdict()
+        kin_diff_rhs = sm.Matrix([kin_diff_dict[q.diff()] for q in
+                                  self.coordinates])
+
+        kwargs = {
+            'mass_matrix': self.eom_method.mass_matrix,
+            'coordinate_derivatives': kin_diff_rhs,
+            'specifieds': specifieds,
+        }
 
         return kwargs
 
