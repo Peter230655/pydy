@@ -459,7 +459,7 @@ Generate a time vector over which the integration will be carried out.
 
 The trajectory of the states over time can be found by calling the
 ``.integrate()`` method. But due to the complexity of the equations of motion
-it is helpful to use the `cython` generator for faster numerical evaluation.
+it is helpful to use the ``cython`` generator for faster numerical evaluation.
 
 .. warning::
 
