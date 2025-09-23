@@ -329,7 +329,7 @@ r : dictionary
         elif v == 'scipy':
             self._solve_linear_system = scipy.linalg.solve
             self._linear_sys_solver = v
-        elif v.startswith('sympy'):
+        elif isinstance(v, str) and v.startswith('sympy'):
             # dummy function
             self._solve_linear_system = lambda A, b: np.nan*np.ones_like(b)
             self._linear_sys_solver = 'sympy'

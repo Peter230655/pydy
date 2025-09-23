@@ -170,7 +170,7 @@ class _CSymbolicLinearSolveGenerator(CMatrixGenerator):
 
     def __init__(self, arguments, matrices, cse=True, verify_arguments=False,
                  sympy_solver='LU'):
-        self.sympy_solver=sympy_solver
+        self.sympy_solver = sympy_solver
         super().__init__(arguments, matrices, cse=True, verify_arguments=False)
 
     def _generate_cse(self, prefix='pydy_'):
