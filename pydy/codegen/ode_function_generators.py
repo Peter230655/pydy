@@ -227,7 +227,7 @@ r : dictionary
             This can be either the "full" mass matrix as in [2] or the
             "minimal" mass matrix as in [3]. The rows and columns must be
             ordered to match the order of the coordinates and speeds. In the
-            case of the full mass matrix, the speeds should always be
+            case of the full mass matrix, the coordinates should always be
             ordered before the speeds, i.e. x = [q, u].
         coordinate_derivatives : sympy.Matrix, shape(m, 1), optional
             If the "minimal" mass matrix, form [3], is supplied, then this
