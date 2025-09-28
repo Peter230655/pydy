@@ -4,6 +4,7 @@ import sys
 from collections.abc import Sequence
 from itertools import chain
 import logging
+from importlib import metadata
 
 import numpy as np
 import numpy.linalg
@@ -11,9 +12,10 @@ import scipy.linalg
 import sympy as sm
 import sympy.physics.mechanics as me
 from sympy.core.function import UndefinedFunction, Derivative
+from packaging.version import parse as parse_version
 Cython = sm.external.import_module('Cython')
 theano = sm.external.import_module('theano')
-symjit = sm.external.import_module('symjit', min_module_version='2.5.0')
+symjit = sm.external.import_module('symjit')
 if theano:
     from sympy.printing.theanocode import theano_function
 if symjit:
@@ -906,6 +908,10 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
         if symjit is None:
             raise ImportError('Symjit must be installed to use this class.')
+
+        symjit_version = metadata.version('symjit')
+        if parse_version(symjit_version) < parse_version('2.5.0'):
+            raise ImportError('Symjit >= 2.5.0 is required.')
 
         self._options = {'cse': True}
 
