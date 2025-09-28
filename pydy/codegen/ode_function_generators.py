@@ -4,6 +4,7 @@ import sys
 from collections.abc import Sequence
 from itertools import chain
 import logging
+from importlib import metadata
 
 import numpy as np
 import numpy.linalg
@@ -11,10 +12,14 @@ import scipy.linalg
 import sympy as sm
 import sympy.physics.mechanics as me
 from sympy.core.function import UndefinedFunction, Derivative
+from packaging.version import parse as parse_version
 Cython = sm.external.import_module('Cython')
 theano = sm.external.import_module('theano')
+symjit = sm.external.import_module('symjit')
 if theano:
     from sympy.printing.theanocode import theano_function
+if symjit:
+    from symjit import compile_func
 
 from .c_code import _CSymbolicLinearSolveGenerator
 from .cython_code import CythonMatrixGenerator
@@ -896,13 +901,127 @@ class TheanoODEFunctionGenerator(ODEFunctionGenerator):
         self.eval_arrays = eval_arrays
 
 
+class SymjitODEFunctionGenerator(ODEFunctionGenerator):
+
+    def __init__(self, *args, **kwargs):
+
+        if symjit is None:
+            raise ImportError('Symjit must be installed to use this class.')
+
+        symjit_version = metadata.version('symjit')
+        if parse_version(symjit_version) < parse_version('2.5.0'):
+            raise ImportError('Symjit >= 2.5.0 is required.')
+
+        self._options = {'cse': True}
+
+        for k, v in self._options.items():
+            self._options[k] = kwargs.pop(k, v)
+
+        super().__init__(*args, **kwargs)
+
+    __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
+
+    def _symjitify(self, outputs):
+        # NOTE : symjit currently only works with expressions made up of
+        # Symbol() not Function()(Symbol()) so we have to replace all functions
+        # of time with symbols.
+        repl = {}
+        for seq in self.inputs[:-1]:  # skip p
+            for v in seq:
+                repl[v] = sm.Symbol(v.name)  # TODO : apply assumptions
+
+        # NOTE : symjit only accepts an expression or a list of expressions, so
+        # we have to flatten the matrices and make a long list of all
+        # expressions.
+        new_outputs = []
+        for o in outputs:
+            for expr in o:
+                new_outputs.append(expr.xreplace(repl))
+
+        # NOTE : symjit does not allow iterable of iterables as the function
+        # arguments so all symbols in the expression are expanded into one long
+        # list.
+        new_inputs = list(repl.values()) + list(self.inputs[-1])
+
+        return compile_func(new_inputs, new_outputs, cse=self._options['cse'])
+
+    def generate_full_rhs_function(self):
+
+        self.define_inputs()
+        outputs = [self.right_hand_side]
+
+        f = self._symjitify(outputs)
+
+        # NOTE : symjit outputs a list of floats, not a NumPy array of floats.
+        if self.specifieds is None:
+            def wrapper(q, u, p):
+                return np.asarray(f.apply(np.hstack((q, u, p))))
+        else:
+            def wrapper(q, u, r, p):
+                return np.asarray(f.apply(np.hstack((q, u, r, p))))
+
+        self.eval_arrays = wrapper
+
+    def generate_full_mass_matrix_function(self):
+
+        self.define_inputs()
+        outputs = [self.mass_matrix, self.right_hand_side]
+
+        f = self._symjitify(outputs)
+
+        m_dim = len(self.inputs[0]) + len(self.inputs[1])
+
+        if self.specifieds is None:
+            def wrapper(q, u, p):
+                all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
+                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                f_vals = all_vals[m_dim*m_dim:]
+                return m_vals, f_vals
+        else:
+            def wrapper(q, u, r, p):
+                all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
+                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                f_vals = all_vals[m_dim*m_dim:]
+                return m_vals, f_vals
+
+        self.eval_arrays = wrapper
+
+    def generate_min_mass_matrix_function(self):
+
+        self.define_inputs()
+        outputs = [self.mass_matrix, self.right_hand_side,
+                   self.coordinate_derivatives]
+
+        f = self._symjitify(outputs)
+
+        m_dim = len(self.inputs[1])
+
+        if self.specifieds is None:
+            def convert_symjit_output(q, u, p):
+                all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
+                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + m_dim]
+                k_vals = all_vals[m_dim*m_dim + m_dim:]
+                return m_vals, f_vals, k_vals
+        else:
+            def convert_symjit_output(q, u, r, p):
+                all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
+                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + m_dim]
+                k_vals = all_vals[m_dim*m_dim + m_dim:]
+                return m_vals, f_vals, k_vals
+
+        self.eval_arrays = convert_symjit_output
+
+
 def generate_ode_function(*args, **kwargs):
     """This is a function wrapper to the above classes. The docstring is
     automatically generated below."""
 
     generators = {'lambdify': LambdifyODEFunctionGenerator,
                   'cython': CythonODEFunctionGenerator,
-                  'theano': TheanoODEFunctionGenerator}
+                  'theano': TheanoODEFunctionGenerator,
+                  'symjit': SymjitODEFunctionGenerator}
 
     generator = kwargs.pop('generator', 'lambdify')
 
@@ -938,7 +1057,7 @@ _extra_parameters_doc = \
 """
         generator : string or and ODEFunctionGenerator, optional
             The method used for generating the numeric right hand side. The
-            string options are {'lambdify'|'theano'|'cython'} with
+            string options are {'lambdify'|'theano'|'cython'|'symjit'} with
             'lambdify' being the default. You can also pass in a custom
             subclass of ODEFunctionGenerator.
 

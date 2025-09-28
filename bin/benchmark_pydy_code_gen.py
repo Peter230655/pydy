@@ -2,8 +2,10 @@
 
 # standard library
 import time
+import timeit
 
 # external libraries
+import numpy as np
 from numpy import hstack, ones, pi, linspace, array, zeros, zeros_like, nan
 from pydy.models import n_link_pendulum_on_cart
 from sympy import symbols
@@ -18,11 +20,12 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
     for each n up to the max number provided and generates a plot of the
     results."""
 
-    methods = ['lambdify', 'cython', 'theano']
+    methods = ['lambdify', 'cython', 'theano', 'symjit']
 
     link_numbers = range(1, max_num_links + 1)
 
     derivation_times = zeros(len(link_numbers))
+    rhs_times = zeros((max_num_links, len(methods)))
     integration_times = zeros((max_num_links, len(methods)))
     code_generation_times = zeros_like(integration_times)
 
@@ -72,7 +75,7 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
             print('-' * len(subtitle))
             start = time.time()
             try:
-                sys.generate_ode_function(generator=method, cse=True)
+                rhs = sys.generate_ode_function(generator=method, cse=True)
             # ImportError: Theano or Cython not installed
             # AttributeError: Theano doesn't work with new NumPy versions
             except (ImportError, AttributeError):
@@ -84,6 +87,13 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
                 print('The code generation took {:1.5f} seconds.'.format(
                     code_generation_times[j, k]))
 
+                p_vals = np.array(parameter_vals)
+                rhs_time = timeit.timeit(lambda: rhs(x0, 0.1, p_vals),
+                                         number=1000)
+                rhs_times[j, k] = rhs_time
+                print('rhs() evaluation took {:1.5f} seconds.'.format(
+                    rhs_time))
+
                 start = time.time()
                 sys.integrate()
                 integration_times[j, k] = time.time() - start
@@ -93,7 +103,8 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
         del sys
 
     # plot the results
-    fig, ax = plt.subplots(3, 1, sharex=True, layout='constrained')
+    fig, ax = plt.subplots(4, 1, sharex=True, layout='constrained',
+                           figsize=(6, 6))
 
     ax[0].plot(link_numbers, derivation_times)
     ax[0].set_title('Symbolic Derivation Time')
@@ -103,10 +114,15 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
     ax[1].set_title('Code Generation Time')
     ax[1].legend(methods, loc=2)
 
-    ax[2].plot(link_numbers, integration_times)
+    ax[2].plot(link_numbers, rhs_times)
     ax[2].set_yscale('log')
-    ax[2].set_title('Integration Time')
+    ax[2].set_title('ODE Evaluation Time')
     ax[2].legend(methods, loc=2)
+
+    ax[3].plot(link_numbers, integration_times)
+    ax[3].set_yscale('log')
+    ax[3].set_title('Integration Time')
+    ax[3].legend(methods, loc=2)
 
     for a in ax.flatten():
         a.set_ylabel('Time [s]')

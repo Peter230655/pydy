@@ -26,7 +26,8 @@ extras_require = {
     ],
     'codegen': [
         'Cython>=0.29.28',
-        'Theano>=1.0.5'
+        'Theano>=1.0.5',
+        'symjit>=2.5.0',
     ],
     'examples': [
         'matplotlib>=3.5.1',
