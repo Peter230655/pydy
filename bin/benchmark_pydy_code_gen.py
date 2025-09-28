@@ -104,7 +104,7 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
 
     # plot the results
     fig, ax = plt.subplots(4, 1, sharex=True, layout='constrained',
-                           figsize=(5, 6))
+                           figsize=(6, 6))
 
     ax[0].plot(link_numbers, derivation_times)
     ax[0].set_title('Symbolic Derivation Time')
