@@ -2,12 +2,14 @@
 
 from random import choice
 import warnings
+from importlib import metadata
 
 import numpy as np
 import scipy as sp
 import sympy as sm
 from pydy.codegen.ode_function_generators import generate_ode_function
 import pytest
+from packaging.version import parse as parse_version
 
 Cython = sm.external.import_module('Cython')
 theano = sm.external.import_module('theano')
@@ -299,6 +301,10 @@ class TestODEFunctionGeneratorSubclasses(object):
                       " skipped.", PyDyImportWarning)
 
     if symjit:
+        symjit_version = metadata.version('symjit')
+    else:
+        symjit_version = '0.0.1'
+    if parse_version(symjit_version) < parse_version('2.5.0'):
         ode_function_subclasses.append(SymjitODEFunctionGenerator)
     else:
         warnings.warn("Symjit was not found so the related tests are being"
