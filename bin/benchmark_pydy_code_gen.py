@@ -5,14 +5,10 @@ import time
 import timeit
 
 # external libraries
-import numpy as np
-from numpy import hstack, ones, pi, linspace, array, zeros, zeros_like, nan
 from pydy.models import n_link_pendulum_on_cart
 from sympy import symbols
-import matplotlib
 import matplotlib.pyplot as plt
-
-matplotlib.use('Agg')
+import numpy as np
 
 
 def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
@@ -24,10 +20,10 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
 
     link_numbers = range(1, max_num_links + 1)
 
-    derivation_times = zeros(len(link_numbers))
-    rhs_times = zeros((max_num_links, len(methods)))
-    integration_times = zeros((max_num_links, len(methods)))
-    code_generation_times = zeros_like(integration_times)
+    derivation_times = np.zeros(len(link_numbers))
+    rhs_times = np.zeros((max_num_links, len(methods)))
+    integration_times = np.zeros_like(rhs_times)
+    code_generation_times = np.zeros_like(rhs_times)
 
     for j, n in enumerate(link_numbers):
 
@@ -47,26 +43,27 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
         print(msg.format(derivation_times[j]))
 
         # Define the numerical values: parameters, time, and initial conditions
-        arm_length = 1.0 / n
-        bob_mass = 0.01 / n
-        parameter_vals = [9.81, 0.01 / n]
+        arm_length = 1.0/n
+        bob_mass = 0.01/n
+        parameter_vals = [9.81, 0.01/n]
         for i in range(n):
             parameter_vals += [arm_length, bob_mass]
 
-        times = linspace(0.0, duration, num=num_time_steps)
+        times = np.linspace(0.0, duration, num=num_time_steps)
         sys.times = times
 
-        x0 = hstack(
-            (0,
-             pi / 2 * ones(len(sys.coordinates) - 1),
-             1e-3 * ones(len(sys.speeds))))
+        x0 = np.hstack((
+            0.0,
+            np.pi/2*np.ones(len(sys.coordinates) - 1),
+            1e-3*np.ones(len(sys.speeds)),
+        ))
         sys.initial_conditions = dict(zip(sys.states, x0))
 
         constants = [g, m[0]]
         for i in range(n):
             constants += [l[i], m[i + 1]]
 
-        sys.constants = dict(zip(constants, array(parameter_vals)))
+        sys.constants = dict(zip(constants, np.array(parameter_vals)))
 
         for k, method in enumerate(methods):
 
@@ -80,8 +77,8 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
             # AttributeError: Theano doesn't work with new NumPy versions
             except (ImportError, AttributeError):
                 print("Skipped {} due to error.\n".format(method))
-                code_generation_times[j, k] = nan
-                integration_times[j, k] = nan
+                code_generation_times[j, k] = np.nan
+                integration_times[j, k] = np.nan
             else:
                 code_generation_times[j, k] = time.time() - start
                 print('The code generation took {:1.5f} seconds.'.format(
