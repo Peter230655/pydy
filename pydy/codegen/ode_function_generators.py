@@ -904,6 +904,9 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
     def __init__(self, *args, **kwargs):
 
+        if symjit is None:
+            raise ImportError('Symjit must be installed to use this class.')
+
         self._options = {'cse': True}
 
         for k, v in self._options.items():
@@ -947,10 +950,10 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
         # NOTE : symjit outputs a list of floats, not a NumPy array of floats.
         if self.specifieds is None:
             def wrapper(q, u, p):
-                return np.asarray(f(*np.hstack((q, u, p))))
+                return np.asarray(f.apply(np.hstack((q, u, p))))
         else:
             def wrapper(q, u, r, p):
-                return np.asarray(f(*np.hstack((q, u, r, p))))
+                return np.asarray(f.apply(np.hstack((q, u, r, p))))
 
         self.eval_arrays = wrapper
 
@@ -965,13 +968,13 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
         if self.specifieds is None:
             def wrapper(q, u, p):
-                all_vals = np.asarray(f(*np.hstack((q, u, p))))
+                all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
                 m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                 f_vals = all_vals[m_dim*m_dim:]
                 return m_vals, f_vals
         else:
             def wrapper(q, u, r, p):
-                all_vals = np.asarray(f(*np.hstack((q, u, r, p))))
+                all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
                 m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                 f_vals = all_vals[m_dim*m_dim:]
                 return m_vals, f_vals
@@ -990,14 +993,14 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
         if self.specifieds is None:
             def convert_symjit_output(q, u, p):
-                all_vals = np.asarray(f(*np.hstack((q, u, p))))
+                all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
                 m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                 f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + m_dim]
                 k_vals = all_vals[m_dim*m_dim + m_dim:]
                 return m_vals, f_vals, k_vals
         else:
             def convert_symjit_output(q, u, r, p):
-                all_vals = np.asarray(f(*np.hstack((q, u, r, p))))
+                all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
                 m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                 f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + m_dim]
                 k_vals = all_vals[m_dim*m_dim + m_dim:]
