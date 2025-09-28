@@ -304,7 +304,7 @@ class TestODEFunctionGeneratorSubclasses(object):
         symjit_version = metadata.version('symjit')
     else:
         symjit_version = '0.0.1'
-    if parse_version(symjit_version) < parse_version('2.5.0'):
+    if parse_version(symjit_version) >= parse_version('2.5.0'):
         ode_function_subclasses.append(SymjitODEFunctionGenerator)
     else:
         warnings.warn("Symjit was not found so the related tests are being"
