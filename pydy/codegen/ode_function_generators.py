@@ -13,7 +13,7 @@ import sympy.physics.mechanics as me
 from sympy.core.function import UndefinedFunction, Derivative
 Cython = sm.external.import_module('Cython')
 theano = sm.external.import_module('theano')
-symjit = sm.external.import_module('symjit')
+symjit = sm.external.import_module('symjit', min_module_version='2.5.0')
 if theano:
     from sympy.printing.theanocode import theano_function
 if symjit:
