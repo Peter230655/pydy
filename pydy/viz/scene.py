@@ -670,7 +670,7 @@ class Scene(object):
                 force = True
 
         if force:
-            shutil.remove_tree(pydy_dir)
+            shutil.rmtree(pydy_dir)
             print("All Done!")
         else:
             print("Aborted!")
