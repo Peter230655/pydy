@@ -11,5 +11,6 @@ dependencies:
   - python =3.12.*  # use newest on RTD (3.13 is failing)
   - pythreejs
   - scipy
+  - setuptools
   - sphinx
   - sympy
