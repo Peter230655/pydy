@@ -6,8 +6,7 @@ import os
 import sys
 import warnings
 import json
-import distutils
-import distutils.dir_util
+import shutil
 import datetime
 from collections import OrderedDict
 
@@ -633,7 +632,7 @@ class Scene(object):
         if not silent:
             print("Copying static data.")
         src = os.path.join(os.path.dirname(__file__), 'static')
-        distutils.dir_util.copy_tree(src, pydy_dir)
+        shutil.copytree(src, pydy_dir)
 
         # Add the two json files to the directory.
         if not silent:
@@ -671,7 +670,7 @@ class Scene(object):
                 force = True
 
         if force:
-            distutils.dir_util.remove_tree(pydy_dir)
+            shutil.remove_tree(pydy_dir)
             print("All Done!")
         else:
             print("Aborted!")
