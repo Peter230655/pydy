@@ -25,7 +25,7 @@ A ball of mass :math:`m` and radius :math:`r` is attached to each rod, such
 that the rod goes through the center of each ball. The center of the ball is
 fixed at the middle of the rod. The ball rotates around the rod.  If two balls
 collide, they are ideally elastic, with spring constant :math:`k`.
-The collision is modeled using the :math:`sm.Heaviside(..)` function.
+The collision is modeled using the ``sm.Heaviside(..)`` function.
 The balls are ideally slick, so collisions will not affect their rotation.
 There may be speed dependent friction between
 the rod and the ball, with coefficient of friction :math:`\textrm{reibung}`.
@@ -37,9 +37,6 @@ Notes
 - *generate_ode_function* needs C - contiguous arrays as inputs, if
   generator = 'cython' is used. This is ensured below by using
   np.ascontiguousarray(..).
-- The animation shows too large, but there is no simple way to fix it, see
-  issue #33. An empirical factor is used to shrink the linear dimensions of the
-  animation.
 
 .. jupyter-execute::
 
@@ -106,20 +103,19 @@ Equations of Motion, Kane's Method
     rot = []      # for kinetatic equations
     rot1 = []     # dto
 
+It is very important, that the angular speeds be expressed in terms of
+the 'child frame', otherwise the equations of motion become very large.
+
+.. jupyter-execute::
+
     A[0].orient_body_fixed(N, (q[0], q[1], q[2]), '123')
     rot.append(A[0].ang_vel_in(N))
-    # it is VERY important, that the angular speed be expressed in therms of
-    # the 'child frame', otherwise
-    # the equations of motion become very large!
     A[0].set_ang_vel(N, u[0]*A[0].x + u[1]*A[0].y + u[2]*A[0].z)
     rot1.append(A[0].ang_vel_in(N))
 
     for i in range(1, n):
         A[i].orient_body_fixed(A[i-1], (q[3*i], q[3*i+1], q[3*i+2]), '123')
         rot.append(A[i].ang_vel_in(N))   # needed for the kin. equations below
-        # it is VERY important, that the angular speed be expressed in terms of
-        # the 'child frame', otherwise
-        # the equations of motion become very large!
         A[i].set_ang_vel(N, u[3*i]*A[i].x + u[3*i+1]*A[i].y + u[3*i+2]*A[i].z)
         rot1.append(A[i].ang_vel_in(N))
 
@@ -181,15 +177,22 @@ Equations of Motion, Kane's Method
 
     FL = FG + FB  # list of forces
 
-    # kinematic equations
+Kinematic equations.
+
+Again it is very important that the frames A[i] be used below. Otherwise
+the equations of motion become very large.
+
+.. jupyter-execute::
+
     kd = []
     for i in range(n):
-        # It is very important that below the frames A[i] be used. Otherwise
-        # the equations of motion become very large.
         for uv in A[i]:
             kd.append(me.dot(rot[i] - rot1[i], uv))
 
-    # Kanes's equations
+Kanes's Equations
+
+.. jupyter-execute::
+
     q1 = q
     u1 = u
     aux = [auxx, auxy, auxz]
@@ -198,11 +201,22 @@ Equations of Motion, Kane's Method
     fr, frstar = KM.kanes_equations(BODY, FL)
 
     react_forces = KM.auxiliary_eqs
-    # Reaction forces contain accelerations. They are replaced by the rhs
-    # and will be calculated numerically below.
+
+The reaction forces (of course) contain accelerations.
+They are replaced by ``rhs`` as place holders and will be calculated
+numerically below. Symbolic calculation would be possible to too
+time consuming.
+
+.. jupyter-execute::
+
     react_forces = me.msubs(react_forces, {u[i].diff(t): rhs_subs[i]
                                        for i in range(len(u))})
 
+
+``generate_ode_function`` needs the mass matrix and the forcing. The
+kinematic differential equations to be supplied separately.
+
+.. jupyter-execute::
 
     # needed for generate_ode_function
     MM = KM.mass_matrix
@@ -259,9 +273,15 @@ Compilation
 
     specified = None
     constants = np.array(pL)
+
+The kinematic equations must be solved for the derivatives of the coordinates.
+The solution must be sorted so that it corresponds to the sequence in KM.q
+
+.. jupyter-execute::
+
     kd = sm.Matrix(kd)
     loesung = sm.solve(kd, [q[i].diff(t) for i in range(3 * n)])
-    # The solution must be sorted so that it corresponds to KM.q
+
     schluessel = [i.diff(t) for i in KM.q]
     kin_eqs_solved = sm.Matrix([loesung[i] for i in schluessel])
 
@@ -279,7 +299,10 @@ Compilation
         specifieds_arg_type='array',
     )
 
-    # Below lambdify is used as speed is of no concern.
+Below lambdify is used as speed is of no concern.
+
+.. jupyter-execute::
+
     # position of the centers of the balls and the red dots on the ball.
     # Needed for the animation
     punkt_loc = []
@@ -319,7 +342,7 @@ Numerical Integration
 
     omega1 = 7.5                  # initial rot. speed of ball_i around A[i].y
     u1x, u1y, u1z = 0., omega1, 0.  # initial angular velocity of the first rod
-    intervall = 10.
+    intervall = 5.0
 
     schritte = 100 * int(intervall)
     times = np.linspace(0., intervall, schritte)
@@ -334,12 +357,18 @@ Numerical Integration
 
     t_span = (0., intervall)
 
+If method other than 'RK45' is used in ``solve_ivp``, a non C contiguous `y`
+is returned. This must be taken care of with ``y = np.ascontiguousarray(y)``.
+
+.. jupyter-execute::
+
+
     def gradient(t, y, args):
-        # This is needed if method != 'RK45' is used
         y = np.ascontiguousarray(y)
         args = np.array(args)
         rhs = rhs_gen(y, t, args)
         return rhs
+
 
     resultat1 = solve_ivp(gradient, t_span, y0, t_eval=times, args=(pL_vals,),
                           method='RK45',
@@ -358,11 +387,13 @@ Numerical Integration
 Calculate the Reaction Forces at the Suspension Point
 -----------------------------------------------------
 
+rhs_gen(a, t, b) needs C contiguous arrays a and b. The value of t is
+not important here, as the system does not explicitly depend on the time.
+
+
 .. jupyter-execute::
 
     # Calculate the accelerations needed for the reaction forces
-    # rhs_gen(a, t, b) needs C contiguous arrays a and b. The value of t is
-    # not important here, as the system does not explicitly depend on the time.
     RHS = np.empty((resultat.shape))
     pl_vals = np.ascontiguousarray(pL_vals)
     for i in range(resultat.shape[0]):
@@ -390,6 +421,7 @@ Calculate the Reaction Forces at the Suspension Point
 
 Plot Energy, Reaction Forces and Angular Momentum
 -------------------------------------------------
+
 .. jupyter-execute::
 
     pot_np = np.empty(schritte)
@@ -416,9 +448,9 @@ Plot Energy, Reaction Forces and Angular Momentum
 
     fig, ax = plt.subplots(4, 1, figsize=(8, 10), layout='constrained',
                            sharex=True)
-    ax[0].plot(times, pot_np, label='potential energy')
+    ax[0].plot(times, pot_np, label='gravitational potential energy')
     ax[0].plot(times, kin_np, label='kinetic energy')
-    ax[0].plot(times, spring_np, label='spring energy')
+    ax[0].plot(times, spring_np, label='spring potential energy')
     ax[0].plot(times, total_np, label='total energy')
     msg = r'$\mu$'
     ax[0].set_title(f"Energies of the system, {msg} = {reibung1}")
@@ -468,9 +500,11 @@ Plot Energy, Reaction Forces and Angular Momentum
 Animation with PyDy Visualization
 =================================
 
+``groesse`` is an empirical factor to get the right size of the animation,
+found by trial and error.
+
 .. jupyter-execute::
 
-    # This an empirical factor to get the right size of the animation.
     groesse = 25.0
 
     farben = ['orange', 'blue', 'green', 'red', 'yellow']
