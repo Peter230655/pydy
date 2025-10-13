@@ -282,7 +282,8 @@ r : dictionary
             slow, are ``array``, ``function``, ``dictionary``, None.\
         time_first : boolean, optional
             By default the argument order of the generated function is ``rhs(x,
-            t, ...)`` and, if false, it will be ``rhs(t, x, ...)``.
+            t, ...)`` and, if this is set to true, it will be ``rhs(t, x,
+            ...)``.
         """
 
         self.right_hand_side = right_hand_side
