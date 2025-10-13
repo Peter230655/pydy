@@ -468,20 +468,21 @@ r : dictionary
 
     def _generate_rhs_docstring(self):
 
-        template_values = {'num_states': self.num_states,
-                           'state_list': self.list_syms(8, self.coordinates
-                                                        + self.speeds),
-                           'specified_call_sig': '',
-                           'constants_explanation':
-                               self._constants_doc_templates[
-                                   self.constants_arg_type].format(**{
-                                       'num_constants': self.num_constants,
-                                       'constant_list': self.list_syms(
-                                           8, self.constants)}),
-                           'specifieds_explanation': '',
-                           'x_and_t': 't, x' if self.time_first else 'x, t',
-                           'time_par_before': self._time_par_template if self.time_first else '',
-                           'time_par_after': '' if self.time_first else self._time_par_template,
+        template_values = {
+            'num_states': self.num_states,
+            'state_list': self.list_syms(8, self.coordinates + self.speeds),
+            'specified_call_sig': '',
+            'constants_explanation': self._constants_doc_templates[
+                self.constants_arg_type].format(**{
+                    'num_constants': self.num_constants,
+                    'constant_list': self.list_syms(8, self.constants)
+                }),
+            'specifieds_explanation': '',
+            'x_and_t': 't, x' if self.time_first else 'x, t',
+            'time_par_before': (self._time_par_template if self.time_first
+                                else ''),
+            'time_par_after': ('' if self.time_first
+                               else self._time_par_template),
         }
 
         if self.specifieds is not None:
@@ -491,8 +492,9 @@ r : dictionary
                 'specified_list': self.list_syms(8, self.specifieds),
                 'x_and_t': 't, x' if self.time_first else 'x, t'}
             template_values['specifieds_explanation'] = \
-                self._specifieds_doc_templates[self.specifieds_arg_type].format(
-                    **specified_template_values)
+                self._specifieds_doc_templates[
+                    self.specifieds_arg_type].format(
+                        **specified_template_values)
 
         return self._rhs_doc_template.format(**template_values)
 
