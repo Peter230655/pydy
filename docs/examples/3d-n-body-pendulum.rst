@@ -12,8 +12,8 @@
 Objectives
 ----------
 
-- Show how to use *generate_ode_function* as an alternative to *lambdify*
-- Show how to use *PyDy Visualization* to generate a 3D animation
+- Show how to use ``generate_ode_function`` as an alternative to ``lambdify``
+- Show how to use ``PyDy Visualization`` to generate a 3D animation
 
 
 Description
@@ -34,9 +34,9 @@ A particle with mass :math:`m_1` is attached to each ball.
 Notes
 -----
 
-- *generate_ode_function* needs C - contiguous arrays as inputs, if
+- ``generate_ode_function`` needs C - contiguous arrays as inputs, if
   generator = 'cython' is used. This is ensured below by using
-  np.ascontiguousarray(..).
+  ``np.ascontiguousarray(..)``.
 
 .. jupyter-execute::
 
@@ -45,7 +45,7 @@ Notes
     import time
     import numpy as np
     import matplotlib.pyplot as plt
-    from scipy.integrate import solve_ivp
+    from scipy.integrate import solve_ivp, odeint
     from scipy.optimize import root
     from pydy.codegen.ode_function_generators import generate_ode_function
     from pydy.viz.shapes import Cylinder, Sphere
@@ -140,7 +140,10 @@ Note the virtual sppeds at P[0], the suspension point.
         A[i].set_ang_vel(N, u[3*i]*A[i].x + u[3*i+1]*A[i].y + u[3*i+2]*A[i].z)
         rot1.append(A[i].ang_vel_in(N))
 
-    # locate the various points, and define their speeds
+Locate the various points, and define their speeds.
+
+.. jupyter-execute::
+
     P[0].set_pos(P0, 0.)
     P[0].set_vel(N, auxx*N.x + auxy*N.y + auxz*N.z)  # Suspension point.
     Dmc[0].set_pos(P[0], l/2. * A[0].y)
@@ -181,16 +184,19 @@ Make the list of the bodies.
 
 Set up the forces.
 
+There are:
+- potential gravitational forces forces
+- potential spring forces when the balls penetrate each other
+- dissipative friction forces due to friction between rods and balls
+
 Note how the reaction forces at P[0] are set up.
 
 .. jupyter-execute::
 
-    # gravitational forces
     FG = ([(Dmc[i], -m*g*N.y) for i in range(n)] +
           [(punkt[i], -m1*g*N.y)for i in range(n)] +
           [(Dmc_link[i], -m_link*g*N.y) for i in range(n)])
 
-    # Reaction forces
     FB = [(P[0], fx*N.x + fy*N.y + fz*N.z)]
     for i in range(n):
         for j in range(i+1, n):
@@ -203,7 +209,7 @@ Note how the reaction forces at P[0] are set up.
             forceji = (Dmc[i], -k * (2 * r - bb) * aa *
                        sm.Heaviside(2 * r - bb))
             FB.append(forceji)
-        # friction between the ball and its axle
+
         friction_i = (A[i], -reibung * u[3*i + 1] * A[i].y)  # around A[i].y
         FB.append(friction_i)
 
@@ -223,6 +229,7 @@ are used.
             kd.append(me.dot(rot[i] - rot1[i], uv))
 
 Kanes's Equations
+-----------------
 
 .. jupyter-execute::
 
@@ -251,7 +258,6 @@ kinematic differential equations to be supplied separately.
 
 .. jupyter-execute::
 
-    # needed for generate_ode_function
     MM = KM.mass_matrix
     print('MM DS', me.find_dynamicsymbols(MM))
     print('MM free symbols', MM.free_symbols)
@@ -285,7 +291,6 @@ Energy, Momentum
             aa = aa.normalize()
             spring_energie += 0.5 * k * (2*r - bb)**2 * sm.Heaviside(2.*r - bb)
 
-    # Calculate angular momenta
     aux_dict = {i: 0 for i in aux}
     ang_moment_x = sum([body.angular_momentum(P0, N).dot(N.x).subs(aux_dict)
                         for body in BODY])
@@ -326,18 +331,18 @@ The solution must be sorted so that it corresponds to the sequence in KM.q
         mass_matrix=MM,
         specifieds=specified,
         coordinate_derivatives=kin_eqs_solved,  # rhs of kin. diff. equations
-        generator='cython',
+        generator='symjit',
         linear_sys_solver='numpy',
         constants_arg_type='array',
-        specifieds_arg_type='array',
+        #specifieds_arg_type='array',
     )
 
 Below lambdify is used as speed is of no concern.
 
+Dmc_loc, punkt_loc are needed for the animation only.
+
 .. jupyter-execute::
 
-    # position of the centers of the balls and the red dots on the ball.
-    # Needed for the animation
     punkt_loc = []
     Dmc_loc = []
     for i in range(n):
@@ -383,7 +388,7 @@ Numerical Integration
     iYY1 = iXX1
     iZZ1 = iXX1
 
-    pL_vals = [m1, m11, m_link1, 9.8, r1, l1, iXX1, iYY1, iZZ1, reibung1, k1]
+    pL_vals = (m1, m11, m_link1, 9.8, r1, l1, iXX1, iYY1, iZZ1, reibung1, k1)
 
     y0 = [q1x, q1y, q1z] + [0.0, 0.0, 0.0] * (n-1) + [u1x, u1y,
         u1z] + [0.0, u1y, 0.0] * (n-1)
@@ -395,26 +400,21 @@ is returned. This must be taken care of with ``y = np.ascontiguousarray(y)``.
 
 .. jupyter-execute::
 
-
     def gradient(t, y, args):
-        y = np.ascontiguousarray(y)
         args = np.array(args)
         rhs = rhs_gen(y, t, args)
         return rhs
 
 
     resultat1 = solve_ivp(gradient, t_span, y0, t_eval=times, args=(pL_vals,),
-                          method='RK45',
-                          rtol=1.e-9,
-                          atol=1.e-9,
+                          method='Radau',
                           )
 
     resultat = resultat1.y.T
 
-    print(resultat1.message)
     print('Shape of resultat', resultat.shape)
     print(f"To numerically integrate an intervall of {intervall:.3f} sec "
-          f"the routine cycled {resultat1.nfev:,} times")
+          f"the routine cycled times")
 
 
 Calculate the Reaction Forces at the Suspension Point
@@ -423,15 +423,17 @@ Calculate the Reaction Forces at the Suspension Point
 rhs_gen(a, t, b) needs C contiguous arrays a and b. The value of t is
 not important here, as the system does not explicitly depend on the time.
 
+The accelerations needed are calculated numerically and stored in ``RHS``
+
 
 .. jupyter-execute::
 
-    # Calculate the accelerations needed for the reaction forces
     RHS = np.empty((resultat.shape))
-    pl_vals = np.ascontiguousarray(pL_vals)
+    #pl_vals = np.ascontiguousarray(pL_vals)
     for i in range(resultat.shape[0]):
-        res = np.ascontiguousarray(resultat[i])
-        RHS[i] = rhs_gen(res, 0.0, pl_vals)
+        #res = np.ascontiguousarray(resultat[i])
+        res = resultat[i]
+        RHS[i] = rhs_gen(res, 0.0, np.array(pL_vals))
 
     react_x = np.empty(resultat.shape[0])
     react_y = np.empty(resultat.shape[0])
@@ -452,8 +454,8 @@ not important here, as the system does not explicitly depend on the time.
         x0 = loesung.x
 
 
-Plot Energy, Reaction Forces and Angular Momentum
--------------------------------------------------
+Plot Energy, Anular Speeds, Reaction Forces and Angular Momentum
+----------------------------------------------------------------
 
 .. jupyter-execute::
 
@@ -489,7 +491,6 @@ Plot Energy, Reaction Forces and Angular Momentum
     ax[0].set_title(f"Energies of the system, {msg} = {reibung1}")
     _ = ax[0].legend()
 
-    # plot the main rotational speeds, uy_r
     for i in range(n, 2*n):
         ax[1].plot(times, resultat[:, 3*i+1], label='rotational speed of '
                    f'body {i - n} in Y direction in its coordinate system')
@@ -573,9 +574,7 @@ found by trial and error.
 
     scene = Scene(N, P0, *viz_frames)
 
-    # Provide the data to compute the trajectories of the visualization frames.
     scene.times = times
-    # Scale the animation.
     pL_vals_scene = [val / groesse for val in pL_vals]
     scene.constants = dict(zip(pL, pL_vals_scene))
     scene.states_symbols = q + u
