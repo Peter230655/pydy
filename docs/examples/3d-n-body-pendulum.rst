@@ -54,15 +54,21 @@ Notes
 
 Number of Bodies
 
+Number of pendulum bodies, labelled 0, 1, .., n-1, must be two or more
+
 .. jupyter-execute::
 
-    # number of pendulum bodies, labelled 0, 1, .., n-1, must be two or more
     n = 3
+
+    if n < 2 or not isinstance(n, int):
+        raise ValueError('n must be an integer larger than 1')
 
 Equations of Motion, Kane's Method
 ==================================
 
 .. jupyter-execute::
+
+    start = time.time()
 
     m, m1, m_link, g, r, l, reibung, k, t = sm.symbols(
         'm, m1, m_link, g, r, l, reibung, k, t')
@@ -79,9 +85,19 @@ Equations of Motion, Kane's Method
     P = []         # points at end of each rod. Dmc_i is between P_i and P_i+1
     punkt = []     # marks a red dot on each ball, just used for animation
     rhs_subs = []  # substitutes for the rhs, to calculate the reaction forces
-    # Virtual speeds and reaction forces
+
+
+Virtual speeds and reaction forces needed to get the reaction forces at the
+suspension point P0.
+
+.. jupyter-execute::
+
     auxx, auxy, auxz, fx, fy, fz = me.dynamicsymbols(
         'auxx, auxy, auxz, fx, fy, fz')
+
+Define the general coordinates, the gen. speeds, the frames and the points.
+
+.. jupyter-execute::
 
     for i in range(n):
         for j in ('x', 'y', 'z'):
@@ -97,14 +113,19 @@ Equations of Motion, Kane's Method
 
     N = me.ReferenceFrame('N')        # inertial frame
     P0 = me.Point('P0')
-    P0.set_vel(N, auxx*N.x + auxy*N.y + auxz*N.z)  # fixed in inertial frame
+    P0.set_vel(N, 0)  # fixed in inertial frame
 
-    # set up the relevant frames, one for each body
-    rot = []      # for kinetatic equations
-    rot1 = []     # dto
+The lists rot, rot1 are needed for the kinematical equations, see below.
+
+.. jupyter-execute::
+
+    rot = []
+    rot1 = []
 
 It is very important, that the angular speeds be expressed in terms of
 the 'child frame', otherwise the equations of motion become very large.
+
+Note the virtual sppeds at P[0], the suspension point.
 
 .. jupyter-execute::
 
@@ -121,7 +142,7 @@ the 'child frame', otherwise the equations of motion become very large.
 
     # locate the various points, and define their speeds
     P[0].set_pos(P0, 0.)
-    P[0].set_vel(N, auxx*N.x + auxy*N.y + auxz*N.z)             # fixed point
+    P[0].set_vel(N, auxx*N.x + auxy*N.y + auxz*N.z)  # Suspension point.
     Dmc[0].set_pos(P[0], l/2. * A[0].y)
     Dmc_link[0].set_pos(P[0], l/2. * A[0].y)
     Dmc_link[0].v2pt_theory(P[0], N, A[0])
@@ -139,7 +160,10 @@ the 'child frame', otherwise the equations of motion become very large.
         punkt[i].set_pos(Dmc[i], r*A[i].z)
         punkt[i].v2pt_theory(Dmc[i], N, A[i])
 
-    # make the list of the bodies
+Make the list of the bodies.
+
+.. jupyter-execute::
+
     balls = []
     points = []
     links = []
@@ -153,13 +177,21 @@ the 'child frame', otherwise the equations of motion become very large.
         links.append(me.RigidBody('link' + str(i), Dmc_link[i], A[i], m_link,
                                   (inert_link, Dmc_link[i])))
     BODY = balls + points + links
-    # set up the forces
-    # weights
+
+
+Set up the forces.
+
+Note how the reaction forces at P[0] are set up.
+
+.. jupyter-execute::
+
+    # gravitational forces
     FG = ([(Dmc[i], -m*g*N.y) for i in range(n)] +
           [(punkt[i], -m1*g*N.y)for i in range(n)] +
           [(Dmc_link[i], -m_link*g*N.y) for i in range(n)])
 
-    FB = [(P0, fx*N.x + fy*N.y + fz*N.z)]  # reaction force at the fixed point
+    # Reaction forces
+    FB = [(P[0], fx*N.x + fy*N.y + fz*N.z)]
     for i in range(n):
         for j in range(i+1, n):
             aa = Dmc[j].pos_from(Dmc[i])
@@ -180,7 +212,8 @@ the 'child frame', otherwise the equations of motion become very large.
 Kinematic equations.
 
 Again it is very important that the frames A[i] be used below. Otherwise
-the equations of motion become very large.
+the equations of motion become very large. Note how rot, rot1 from above
+are used.
 
 .. jupyter-execute::
 
@@ -332,16 +365,16 @@ Numerical Integration
     # Input values
 
     r1 = 1.5                       # radius of the ball
-    m1 = 1.                        # mass of the ball
+    m1 = 1.0                       # mass of the ball
     m11 = m1 / 5.                  # mass of the red dot
     m_link1 = 0.5 * m1             # mass of the link
-    l1 = 6.                        # length of the massless rod of the pendulum
+    l1 = 6.0                       # length of the massless rod of the pendulum
     k1 = 1000.                     # 'spring constant' of the balls
     reibung1 = 0.0                 # friction in the joints
     q1x, q1y, q1z = 0.2, 0.2, 0.2  # initial deflection of the first rod
 
     omega1 = 7.5                  # initial rot. speed of ball_i around A[i].y
-    u1x, u1y, u1z = 0., omega1, 0.  # initial angular velocity of the first rod
+    u1x, u1y, u1z = 0.0, omega1, 0.0  # initial ang. velocity of the first rod
     intervall = 5.0
 
     schritte = 100 * int(intervall)
@@ -352,10 +385,10 @@ Numerical Integration
 
     pL_vals = [m1, m11, m_link1, 9.8, r1, l1, iXX1, iYY1, iZZ1, reibung1, k1]
 
-    y0 = [q1x, q1y, q1z] + [0., 0., 0.] * (n-1) + [u1x, u1y,
-        u1z] + [0.0, u1y, 0.] * (n-1)
+    y0 = [q1x, q1y, q1z] + [0.0, 0.0, 0.0] * (n-1) + [u1x, u1y,
+        u1z] + [0.0, u1y, 0.0] * (n-1)
 
-    t_span = (0., intervall)
+    t_span = (0.0, intervall)
 
 If method other than 'RK45' is used in ``solve_ivp``, a non C contiguous `y`
 is returned. This must be taken care of with ``y = np.ascontiguousarray(y)``.
@@ -508,6 +541,8 @@ found by trial and error.
     groesse = 25.0
 
     farben = ['orange', 'blue', 'green', 'red', 'yellow']
+    if n > len(farben):
+        raise ValueError('More colors must be  given')
     viz_frames = []
 
     for i, (ball, point, link) in enumerate(zip(balls, points, links)):
@@ -547,3 +582,9 @@ found by trial and error.
     scene.states_trajectories = resultat
 
     scene.display_jupyter(axes_arrow_length=20)
+
+Total running time
+
+.. jupyter-execute::
+
+    print(f"It took {time.time() - start:.2f} sec to run the simulation")
