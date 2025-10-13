@@ -35,7 +35,7 @@ Notes
 -----
 
 - ``generate_ode_function`` needs C - contiguous arrays as inputs, if
-  generator = 'cython' is used. This is ensured below by using
+  generator = 'cython' is used. This may be ensured by using
   ``np.ascontiguousarray(..)``.
 
 .. jupyter-execute::
@@ -250,7 +250,7 @@ time consuming.
 .. jupyter-execute::
 
     react_forces = me.msubs(react_forces, {u[i].diff(t): rhs_subs[i]
-                                       for i in range(len(u))})
+                                           for i in range(len(u))})
 
 
 ``generate_ode_function`` needs the mass matrix and the forcing. The
@@ -334,7 +334,8 @@ The solution must be sorted so that it corresponds to the sequence in KM.q
         generator='symjit',
         linear_sys_solver='numpy',
         constants_arg_type='array',
-        #specifieds_arg_type='array',
+        specifieds_arg_type='array',
+        time_first='True',
     )
 
 Below lambdify is used as speed is of no concern.
@@ -388,21 +389,18 @@ Numerical Integration
     iYY1 = iXX1
     iZZ1 = iXX1
 
-    pL_vals = (m1, m11, m_link1, 9.8, r1, l1, iXX1, iYY1, iZZ1, reibung1, k1)
+    pL_vals = [m1, m11, m_link1, 9.8, r1, l1, iXX1, iYY1, iZZ1,
+                       reibung1, k1]
 
     y0 = [q1x, q1y, q1z] + [0.0, 0.0, 0.0] * (n-1) + [u1x, u1y,
         u1z] + [0.0, u1y, 0.0] * (n-1)
 
     t_span = (0.0, intervall)
 
-If method other than 'RK45' is used in ``solve_ivp``, a non C contiguous `y`
-is returned. This must be taken care of with ``y = np.ascontiguousarray(y)``.
-
-.. jupyter-execute::
 
     def gradient(t, y, args):
         args = np.array(args)
-        rhs = rhs_gen(y, t, args)
+        rhs = rhs_gen(t, y, args)
         return rhs
 
 
@@ -414,14 +412,11 @@ is returned. This must be taken care of with ``y = np.ascontiguousarray(y)``.
 
     print('Shape of resultat', resultat.shape)
     print(f"To numerically integrate an intervall of {intervall:.3f} sec "
-          f"the routine cycled times")
+          f"the routine cycled {resultat1.nfev:,} times")
 
 
 Calculate the Reaction Forces at the Suspension Point
 -----------------------------------------------------
-
-rhs_gen(a, t, b) needs C contiguous arrays a and b. The value of t is
-not important here, as the system does not explicitly depend on the time.
 
 The accelerations needed are calculated numerically and stored in ``RHS``
 
@@ -429,11 +424,9 @@ The accelerations needed are calculated numerically and stored in ``RHS``
 .. jupyter-execute::
 
     RHS = np.empty((resultat.shape))
-    #pl_vals = np.ascontiguousarray(pL_vals)
     for i in range(resultat.shape[0]):
-        #res = np.ascontiguousarray(resultat[i])
         res = resultat[i]
-        RHS[i] = rhs_gen(res, 0.0, np.array(pL_vals))
+        RHS[i] = rhs_gen(0.0, res, np.array(pL_vals))
 
     react_x = np.empty(resultat.shape[0])
     react_y = np.empty(resultat.shape[0])
