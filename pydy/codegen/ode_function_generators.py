@@ -279,7 +279,7 @@ r : dictionary
             slow down for performance critical code. If you know apriori
             what arg types you want to support choose either ``array``,
             ``function``, or ``dictionary``. The speed of each, from fast to
-            slow, are ``array``, ``function``, ``dictionary``, None.\
+            slow, are ``array``, ``function``, ``dictionary``, None.
         time_first : boolean, optional
             By default the argument order of the generated function is ``rhs(x,
             t, ...)`` and, if this is set to true, it will be ``rhs(t, x,
@@ -1074,16 +1074,16 @@ def generate_ode_function(*args, **kwargs):
 _docstr = ODEFunctionGenerator.__init__.__doc__
 _extra_parameters_doc = \
 """
-        generator : string or and ODEFunctionGenerator, optional
-            The method used for generating the numeric right hand side. The
-            string options are {'lambdify'|'theano'|'cython'|'symjit'} with
-            'lambdify' being the default. You can also pass in a custom
-            subclass of ODEFunctionGenerator.
+generator : string or and ODEFunctionGenerator, optional
+    The method used for generating the numeric right hand side. The
+    string options are {'lambdify'|'theano'|'cython'|'symjit'} with
+    'lambdify' being the default. You can also pass in a custom
+    subclass of ODEFunctionGenerator.
 
-        Returns
-        =======
-        rhs : function
-            A function which evaluates the derivaties of the states. See the
-            function's docstring for more details after generation.
+Returns
+=======
+rhs : function
+    A function which evaluates the derivaties of the states. See the
+    function's docstring for more details after generation.
 """
 generate_ode_function.__doc__ = ('' * 4 + _docstr + _extra_parameters_doc)
