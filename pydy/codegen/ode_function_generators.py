@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from itertools import chain
 import logging
 from importlib import metadata
+import textwrap
 
 import numpy as np
 import numpy.linalg
@@ -1073,7 +1074,7 @@ def generate_ode_function(*args, **kwargs):
 
 _docstr = ODEFunctionGenerator.__init__.__doc__
 _extra_parameters_doc = \
-"""
+"""\
 generator : string or and ODEFunctionGenerator, optional
     The method used for generating the numeric right hand side. The
     string options are {'lambdify'|'theano'|'cython'|'symjit'} with
@@ -1086,4 +1087,6 @@ rhs : function
     A function which evaluates the derivaties of the states. See the
     function's docstring for more details after generation.
 """
-generate_ode_function.__doc__ = ('' * 4 + _docstr + _extra_parameters_doc)
+# NOTE : I do not understand why this ' '*8 is needed.
+generate_ode_function.__doc__ = (textwrap.dedent(' '*8 + _docstr) +
+                                 _extra_parameters_doc)
