@@ -256,9 +256,10 @@ r : dictionary
             ``sympy`` or ``sympy:<method>`` is provided, the linear system will
             be solved symbolically in an efficient manner. ``<method>`` method
             can be any valid method for
-            :meth:`sympy.matrices.matrixbase.MatrixBase.solve`, such as ``LU``,
-            ``CH``, or ``CRAMER``. The default is ``LU`` if only ``sympy`` is
-            provided.  The symbolic solve only works with the Cython generator.
+            :external+sympy:meth:`~sympy.matrices.matrixbase.MatrixBase.solve`,
+            such as ``LU``, ``CH``, or ``CRAMER``. The default is ``LU`` if
+            only ``sympy`` is provided.  The symbolic solve only works with the
+            Cython generator.
         constants_arg_type : string
             The generated function accepts two different types of arguments
             for the numerical values of the constants: either a ndarray of

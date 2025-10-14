@@ -78,6 +78,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.ifconfig',
+    'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
     'numpydoc',
 ]
@@ -182,6 +183,16 @@ pygments_style = 'sphinx'
 # If true, keep warnings as "system message" paragraphs in the built documents.
 #keep_warnings = False
 
+# Setup intersphinx so that we can reference the SymPy documentation.
+# :external:py:func:`~sympy.physics.vector.functions.dot` for example.
+intersphinx_mapping = {
+    #'matplotlib': ('https://matplotlib.org/stable/', None),
+    #'numpy': ('https://numpy.org/doc/stable/', None),
+    #'py3js': ('https://pythreejs.readthedocs.io/en/stable', None),
+    #'python': ('http://docs.python.org/', None),
+    #'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+    'sympy': ('https://docs.sympy.org/latest/', None),
+}
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -402,6 +413,4 @@ epub_copyright = u'{}, PyDy Authors'.format(COPYRIGHT_YEARS)
 # If false, no index is generated.
 #epub_use_index = True
 
-
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'http://docs.python.org/': None}

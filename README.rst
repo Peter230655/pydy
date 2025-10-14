@@ -123,7 +123,7 @@ PyDy has optional dependencies for extended code generation on:
 
 - Cython_ >= 0.29.28
 - Theano_ >= 1.0.5
-- symjit_ >= 2.5.0
+- Symjit_ >= 2.5.0
 
 and animated visualizations with ``Scene.display_jupyter()`` on:
 
@@ -138,7 +138,7 @@ or interactive animated visualizations with ``Scene.display_ipython()`` on:
 
 .. _Cython: http://cython.org/
 .. _Theano: http://deeplearning.net/software/theano/
-.. _symjit: https://github.com/siravan/symjit
+.. _Symjit: https://github.com/siravan/symjit
 .. _Jupyter Notebook: https://jupyter-notebook.readthedocs.io
 .. _Jupyter Lab: https://jupyterlab.readthedocs.io
 

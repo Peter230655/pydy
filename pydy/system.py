@@ -7,12 +7,14 @@ Here is the procedure for using this class.
 
     1. specify your options either via the constructor or via the
        attributes.
-    2. optionally, call ``generate_ode_function()`` if you want to customize
-       how the ODE function is generated.
-    3. call ``integrate()`` to simulate your system.
+    2. optionally, call :py:meth:`~pydy.system.System.generate_ode_function` if
+       you want to customize how the ODE function is generated.
+    3. call :py:meth:`~pydy.system.System.integrate` to simulate your system.
 
 The simplest usage of this class is as follows. First, we need a
-KanesMethod object on which we have already invoked ``kanes_equations()``::
+:external+sympy:py:class:`~sympy.physics.mechanics.kane.KanesMethod` object on
+which we have already invoked
+:external+sympy:py:meth:`~sympy.physics.mechanics.kane.KanesMethod.kanes_equations`::
 
     km = KanesMethod(...)
     km.kanes_equations(force_list, body_list)
