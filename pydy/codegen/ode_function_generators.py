@@ -1075,11 +1075,11 @@ def generate_ode_function(*args, **kwargs):
 _docstr = ODEFunctionGenerator.__init__.__doc__
 _extra_parameters_doc = \
 """\
-generator : string or and ODEFunctionGenerator, optional
-    The method used for generating the numeric right hand side. The
-    string options are {'lambdify'|'theano'|'cython'|'symjit'} with
-    'lambdify' being the default. You can also pass in a custom
-    subclass of ODEFunctionGenerator.
+generator : string or ODEFunctionGenerator, optional
+    The method used for generating the numeric right hand side. The string
+    options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
+    being the default. You can also pass in a custom subclass of
+    ODEFunctionGenerator.
 
 Returns
 =======
