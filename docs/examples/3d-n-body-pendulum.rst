@@ -35,8 +35,10 @@ Notes
 -----
 
 - ``generate_ode_function`` needs C - contiguous arrays as inputs, if
-  generator = 'cython' is used. This may be ensured by using
-  ``np.ascontiguousarray(..)``.
+  generator = 'cython' is used. If in ``solve_ivp`` method :math:`\neq`'RK45',
+  it will return non C contiguous ``y``. Then ``rhs_gen`` cannot be used
+  directly, but a separate function must be defined, which must contain
+  ``y = np.ascontiguousarray(y)``
 
 .. jupyter-execute::
 
@@ -125,7 +127,7 @@ The lists rot, rot1 are needed for the kinematical equations, see below.
 It is very important, that the angular speeds be expressed in terms of
 the 'child frame', otherwise the equations of motion become very large.
 
-Note the virtual sppeds at P[0], the suspension point.
+Note the virtual speeds at P[0], the suspension point.
 
 .. jupyter-execute::
 
@@ -389,22 +391,15 @@ Numerical Integration
     iYY1 = iXX1
     iZZ1 = iXX1
 
-    pL_vals = [m1, m11, m_link1, 9.8, r1, l1, iXX1, iYY1, iZZ1,
-                       reibung1, k1]
+    pL_vals = np.array([m1, m11, m_link1, 9.8, r1, l1, iXX1, iYY1, iZZ1,
+                       reibung1, k1])
 
     y0 = [q1x, q1y, q1z] + [0.0, 0.0, 0.0] * (n-1) + [u1x, u1y,
         u1z] + [0.0, u1y, 0.0] * (n-1)
 
     t_span = (0.0, intervall)
 
-
-    def gradient(t, y, args):
-        args = np.array(args)
-        rhs = rhs_gen(t, y, args)
-        return rhs
-
-
-    resultat1 = solve_ivp(gradient, t_span, y0, t_eval=times, args=(pL_vals,),
+    resultat1 = solve_ivp(rhs_gen, t_span, y0, t_eval=times, args=(pL_vals,),
                           method='Radau',
                           )
 
@@ -425,8 +420,8 @@ The accelerations needed are calculated numerically and stored in ``RHS``
 
     RHS = np.empty((resultat.shape))
     for i in range(resultat.shape[0]):
-        res = resultat[i]
-        RHS[i] = rhs_gen(0.0, res, np.array(pL_vals))
+        res = np.array(resultat[i])
+        RHS[i] = rhs_gen(0.0, res, pL_vals)
 
     react_x = np.empty(resultat.shape[0])
     react_y = np.empty(resultat.shape[0])
@@ -447,8 +442,8 @@ The accelerations needed are calculated numerically and stored in ``RHS``
         x0 = loesung.x
 
 
-Plot Energy, Anular Speeds, Reaction Forces and Angular Momentum
-----------------------------------------------------------------
+Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
+-----------------------------------------------------------------
 
 .. jupyter-execute::
 
