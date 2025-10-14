@@ -27,6 +27,198 @@ from ...utils import PyDyImportWarning
 warnings.simplefilter('once', PyDyImportWarning)
 
 
+def test_rhs_arg_order():
+
+    sys = models.n_link_pendulum_on_cart(n=2, cart_force=False,
+                                         joint_torques=True)
+
+    g_x_t = LambdifyODEFunctionGenerator(
+        sys.eom_method.forcing_full,
+        sys.coordinates,
+        sys.speeds,
+        list(sm.ordered(sys.constants_symbols)),
+        mass_matrix=sys.eom_method.mass_matrix_full,
+        specifieds=list(sm.ordered(sys.specifieds_symbols)),
+    )
+    rhs_func_x_t = g_x_t.generate()
+
+    g_t_x = LambdifyODEFunctionGenerator(
+        sys.eom_method.forcing_full,
+        sys.coordinates,
+        sys.speeds,
+        list(sm.ordered(sys.constants_symbols)),
+        mass_matrix=sys.eom_method.mass_matrix_full,
+        specifieds=list(sm.ordered(sys.specifieds_symbols)),
+        time_first=True,
+    )
+    rhs_func_t_x = g_t_x.generate()
+
+    x = np.random.random(g_x_t.num_coordinates + g_x_t.num_speeds)
+    t = 5.125
+    p = np.random.random(g_x_t.num_constants)
+    r = np.random.random(g_x_t.num_specifieds)
+
+    def eval_r_x_t(x, t):
+        np.testing.assert_allclose(5.125, t)
+        return r
+
+    def eval_r_t_x(t, x):
+        np.testing.assert_allclose(5.125, t)
+        return r
+
+    np.testing.assert_allclose(rhs_func_x_t(x, t, eval_r_x_t, p),
+                               rhs_func_t_x(t, x, eval_r_t_x, p))
+    expected_x_t_doc = """\
+Returns the derivatives of the states, i.e. numerically evaluates the right
+hand side of the first order differential equation.
+
+x' = f(x, t, r, p)
+
+Parameters
+==========
+x : ndarray, shape(6,)
+    The state vector is ordered as such:
+        - q0(t)
+        - q1(t)
+        - q2(t)
+        - u0(t)
+        - u1(t)
+        - u2(t)
+t : float
+    The current time.
+r : dictionary; ndarray, shape(2,); function
+
+    There are three options for this argument. (1) is more flexible but
+    (2) and (3) are much more efficient.
+
+    (1) A dictionary that maps the specified functions of time to floats,
+    ndarrays, or functions that produce ndarrays. The keys can be a single
+    specified symbolic function of time or a tuple of symbols. The total
+    number of symbols must be equal to 2. If the value is a
+    function it must be of the form g(x, t), where x is the current state
+    vector ndarray and t is the current time float and it must return an
+    ndarray of the correct shape. For example::
+
+      r = {a: 1.0,
+           (d, b) : np.array([1.0, 2.0]),
+           (e, f) : lambda x, t: np.array(x[0], x[1]),
+           c: lambda x, t: np.array(x[2])}
+
+    (2) A ndarray with the specified values in the correct order and of the
+    correct shape.
+
+    (3) A function that must be of the form g(x, t), where x is the current
+    state vector and t is the current time and it must return an ndarray of
+    the correct shape.
+
+    The specified inputs are, in order:
+        - T1(t)
+        - T2(t)
+p : dictionary len(6) or ndarray shape(6,)
+    Either a dictionary that maps the constants symbols to their numerical
+    values or an array with the constants in the following order:
+        - g
+        - l0
+        - l1
+        - m0
+        - m1
+        - m2
+
+Returns
+=======
+dx : ndarray, shape(6,)
+    The derivative of the state vector.
+
+"""
+    assert rhs_func_x_t.__doc__ == expected_x_t_doc
+
+    expected_t_x_doc = """\
+Returns the derivatives of the states, i.e. numerically evaluates the right
+hand side of the first order differential equation.
+
+x' = f(t, x, r, p)
+
+Parameters
+==========
+t : float
+    The current time.
+x : ndarray, shape(6,)
+    The state vector is ordered as such:
+        - q0(t)
+        - q1(t)
+        - q2(t)
+        - u0(t)
+        - u1(t)
+        - u2(t)
+r : dictionary; ndarray, shape(2,); function
+
+    There are three options for this argument. (1) is more flexible but
+    (2) and (3) are much more efficient.
+
+    (1) A dictionary that maps the specified functions of time to floats,
+    ndarrays, or functions that produce ndarrays. The keys can be a single
+    specified symbolic function of time or a tuple of symbols. The total
+    number of symbols must be equal to 2. If the value is a
+    function it must be of the form g(t, x), where x is the current state
+    vector ndarray and t is the current time float and it must return an
+    ndarray of the correct shape. For example::
+
+      r = {a: 1.0,
+           (d, b) : np.array([1.0, 2.0]),
+           (e, f) : lambda t, x: np.array(x[0], x[1]),
+           c: lambda t, x: np.array(x[2])}
+
+    (2) A ndarray with the specified values in the correct order and of the
+    correct shape.
+
+    (3) A function that must be of the form g(t, x), where x is the current
+    state vector and t is the current time and it must return an ndarray of
+    the correct shape.
+
+    The specified inputs are, in order:
+        - T1(t)
+        - T2(t)
+p : dictionary len(6) or ndarray shape(6,)
+    Either a dictionary that maps the constants symbols to their numerical
+    values or an array with the constants in the following order:
+        - g
+        - l0
+        - l1
+        - m0
+        - m1
+        - m2
+
+Returns
+=======
+dx : ndarray, shape(6,)
+    The derivative of the state vector.
+
+"""
+    assert rhs_func_t_x.__doc__ == expected_t_x_doc
+
+    # NOTE : This has to have the exact wrapping as the docstrings it is
+    # assembled from.
+    expected_end = """\
+time_first : boolean, optional
+    By default the argument order of the generated function is ``F(x,
+    t, r, p)`` and, if this is set to true, it will be ``F(t, x, r,
+    p)``.
+generator : string or ODEFunctionGenerator, optional
+    The method used for generating the numeric right hand side. The string
+    options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
+    being the default. You can also pass in a custom subclass of
+    ODEFunctionGenerator.
+
+Returns
+=======
+rhs : function
+    A function which evaluates the derivaties of the states. See the
+    function's docstring for more details after generation.
+"""
+
+    assert generate_ode_function.__doc__.endswith(expected_end)
+
+
 def test_symbolic_linear_solve_full_mass_matrix():
     sys = models.n_link_pendulum_on_cart(n=5, cart_force=False,
                                          joint_torques=False)
