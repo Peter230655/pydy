@@ -248,17 +248,17 @@ r : dictionary
             The specified exogenous inputs to the system. These should be
             functions of time and the order does not matter.
         linear_sys_solver : string or function
-            Specify either `numpy` or `scipy` to use the linear solvers
+            Specify either ``numpy`` or ``scipy`` to use the linear solvers
             provided in each package or supply a function that solves a linear
-            system Ax=b with the call signature x = solve(A, b). For example,
-            if you need to use custom kwargs for the SciPy solver, pass in a
-            lambda function that wraps the solver and sets them. If `sympy` or
-            `sympy:<method>` is provided, the linear system will be solved
-            symbolically in an efficient manner. `<method>` method can be any
-            valid method for
-            :meth:`sympy.matrices.matrixbase.MatrixBase.solve`, such as `LU`,
-            `CH`, or `CRAMER`. The default is `LU` if only `sympy` is provided.
-            The symbolic solve only works with the Cython generator.
+            system ``Ax=b`` with the call signature ``x = solve(A, b)``. For
+            example, if you need to use custom kwargs for the SciPy solver,
+            pass in a lambda function that wraps the solver and sets them. If
+            ``sympy`` or ``sympy:<method>`` is provided, the linear system will
+            be solved symbolically in an efficient manner. ``<method>`` method
+            can be any valid method for
+            :meth:`sympy.matrices.matrixbase.MatrixBase.solve`, such as ``LU``,
+            ``CH``, or ``CRAMER``. The default is ``LU`` if only ``sympy`` is
+            provided.  The symbolic solve only works with the Cython generator.
         constants_arg_type : string
             The generated function accepts two different types of arguments
             for the numerical values of the constants: either a ndarray of
@@ -282,9 +282,9 @@ r : dictionary
             ``function``, or ``dictionary``. The speed of each, from fast to
             slow, are ``array``, ``function``, ``dictionary``, None.
         time_first : boolean, optional
-            By default the argument order of the generated function is ``rhs(x,
-            t, ...)`` and, if this is set to true, it will be ``rhs(t, x,
-            ...)``.
+            By default the argument order of the generated function is ``F(x,
+            t, r, p)`` and, if this is set to true, it will be ``F(t, x, r,
+            p)``.
         """
 
         self.right_hand_side = right_hand_side
