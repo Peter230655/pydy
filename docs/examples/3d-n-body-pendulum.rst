@@ -62,7 +62,7 @@ Number of pendulum bodies, labelled 0, 1, .., n-1, must be two or more
 
     n = 3
 
-    if n < 2 or not isinstance(n, int):
+    if n <= 1 or not isinstance(n, int):
         raise ValueError('n must be an integer larger than 1')
 
 Equations of Motion, Kane's Method
