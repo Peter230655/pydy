@@ -9,7 +9,7 @@ from pydy.codegen.ode_function_generators import (
     generate_ode_function, CythonODEFunctionGenerator)
 
 
-sys = models.n_link_pendulum_on_cart(8, True, True)
+sys = models.n_link_pendulum_on_cart(4, True, True)
 constants = list(sm.ordered(sys.constants_symbols))
 specifieds = list(sm.ordered(sys.specifieds_symbols))
 
