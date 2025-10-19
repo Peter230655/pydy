@@ -13,9 +13,10 @@ sys = models.n_link_pendulum_on_cart(4, True, True)
 constants = list(sm.ordered(sys.constants_symbols))
 specifieds = list(sm.ordered(sys.specifieds_symbols))
 
-p_array = np.random.random(len(constants))
+t_val = 3.1
+x_array = np.random.random(len(sys.states))
 r_array = np.random.random(len(specifieds))
-x = np.random.random(len(sys.states))
+p_array = np.random.random(len(constants))
 
 itr = 10000
 
@@ -32,8 +33,10 @@ rhs_sym = generate_ode_function(
     specifieds_arg_type='array',
     generator='cython')
 
-time = timeit.timeit(lambda: rhs_sym(x, 0.0, r_array, p_array), number=itr)
+time = timeit.timeit(lambda: rhs_sym(x_array, 0.0, r_array, p_array), number=itr)
 print('SymPy LU decomposition symbolic solve time: ', time)
+sympy_solve_res = rhs_sym(x_array, 0.0, r_array, p_array)
+print(sympy_solve_res)
 
 g = CythonODEFunctionGenerator(
     sys.eom_method.forcing,
@@ -49,8 +52,11 @@ g = CythonODEFunctionGenerator(
 )
 rhs_num = g.generate()
 
-time = timeit.timeit(lambda: rhs_num(x, 0.0, r_array, p_array), number=itr)
+time = timeit.timeit(lambda: rhs_num(x_array, 0.0, r_array, p_array),
+                     number=itr)
 print('numpy.linalg.solve time: ', time)
+numpy_linalg_solve_res = rhs_num(x_array, 0.0, r_array, p_array).copy()
+print(numpy_linalg_solve_res)
 
 
 def numpy_umath_linalg_solve(A, b):
@@ -58,8 +64,11 @@ def numpy_umath_linalg_solve(A, b):
 
 
 g.linear_sys_solver = numpy_umath_linalg_solve
-time = timeit.timeit(lambda: rhs_num(x, 0.0, r_array, p_array), number=itr)
+time = timeit.timeit(lambda: rhs_num(x_array, 0.0, r_array, p_array),
+                     number=itr)
 print('numpy.linalg._umath_linalg.solve time: ', time)
+numpy_umath_linalg_solve_res = rhs_num(x_array, 0.0, r_array, p_array).copy()
+print(numpy_umath_linalg_solve_res)
 
 
 def scipy_linalg_solve(A, b):
@@ -69,15 +78,31 @@ def scipy_linalg_solve(A, b):
 
 
 g.linear_sys_solver = scipy_linalg_solve
-time = timeit.timeit(lambda: rhs_num(x, 0.0, r_array, p_array), number=itr)
+time = timeit.timeit(lambda: rhs_num(x_array, 0.0, r_array, p_array),
+                     number=itr)
 print('scipy.linalg.solve (Cholesky) time: ', time)
+scipy_linalg_solve_res = rhs_num(x_array, 0.0, r_array, p_array).copy()
+print(scipy_linalg_solve_res)
 
 
 def scipy_linalg_lapack_dposv(A, b):
+    # TODO : This returns NaN, arrays must need some manipulation first.
     sp.linalg.lapack.dposv(A, b, lower=True, overwrite_a=True,
                            overwrite_b=True)
 
 
 g.linear_sys_solver = scipy_linalg_lapack_dposv
-time = timeit.timeit(lambda: rhs_num(x, 0.0, r_array, p_array), number=itr)
+time = timeit.timeit(lambda: rhs_num(x_array, 0.0, r_array, p_array),
+                     number=itr)
 print('scipy.linalg.lapack.dposv time: ', time)
+scipy_linalg_lapack_dposv_res = rhs_num(x_array, 0.0, r_array, p_array).copy()
+print(scipy_linalg_lapack_dposv_res)
+
+np.testing.assert_allclose(sympy_solve_res,
+                           numpy_linalg_solve_res)
+np.testing.assert_allclose(numpy_linalg_solve_res,
+                           numpy_umath_linalg_solve_res)
+np.testing.assert_allclose(numpy_umath_linalg_solve_res,
+                           scipy_linalg_solve_res)
+np.testing.assert_allclose(scipy_linalg_solve_res,
+                           scipy_linalg_lapack_dposv_res)
