@@ -86,9 +86,9 @@ print(scipy_linalg_solve_res)
 
 
 def scipy_linalg_lapack_dposv(A, b):
-    # TODO : This returns NaN, arrays must need some manipulation first.
-    sp.linalg.lapack.dposv(A, b, lower=True, overwrite_a=True,
-                           overwrite_b=True)
+    _, x, _ = sp.linalg.lapack.dposv(A, b, lower=True, overwrite_a=True,
+                                     overwrite_b=True)
+    return np.squeeze(x)
 
 
 g.linear_sys_solver = scipy_linalg_lapack_dposv
