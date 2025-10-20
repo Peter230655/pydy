@@ -1,3 +1,10 @@
+"""The purpose of this script is to compare the computational speed of the
+various options for solving the dynamical differential equations linear system
+for the accelerations, i.e M*u' = F -> u' = M^-1*F. Except for the
+linear_sys_solver='sympy' option, PyDy executes a Python function for solving
+Ax = b which has some overhead relative to doing the linear system solve in
+C."""
+
 import timeit
 
 import numpy as np
@@ -7,7 +14,6 @@ import scipy as sp
 from pydy import models
 from pydy.codegen.ode_function_generators import (
     generate_ode_function, CythonODEFunctionGenerator)
-
 
 sys = models.n_link_pendulum_on_cart(4, True, True)
 constants = list(sm.ordered(sys.constants_symbols))
