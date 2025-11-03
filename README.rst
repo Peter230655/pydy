@@ -368,10 +368,12 @@ publications or on the web. This citation can be used:
    Conference, 2013, `10.1115/DETC2013-13470
    <http://dx.doi.org/10.1115/DETC2013-13470>`_.
 
-PyDy is built by (made with `contrib.rocks <https://contrib.rocks>`_):
 
-.. image:: https://contrib.rocks/image?repo=pydy/pydy
-   :target: https://github.com/pydy/pydy/graphs/contributors
+.. raw:: html
+
+   <p>PyDy is built by (made with <a
+   href="https://contrib.rocks">contrib.rocks</a> :</p>
+   <a href="https://github.com/pydy/pydy/graphs/contributors"><img src="https://contrib.rocks/image?repo=pydy/pydy"></a>
 
 Questions, Bugs, Feature Requests
 =================================
