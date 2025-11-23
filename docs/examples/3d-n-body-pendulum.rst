@@ -458,6 +458,7 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
 
 .. jupyter-execute::
 
+    schritte = resultat.shape[0]
     pot_np = np.empty(schritte)
     kin_np = np.empty(schritte)
     spring_np = np.empty(schritte)
