@@ -13,6 +13,7 @@ Objectives
 ----------
 
 - Show how to use ``generate_ode_function`` as an alternative to ``lambdify``
+- Show how to handle non C-contiguous arrays.
 - Show how to use ``PyDy Visualization`` to generate a 3D animation
 
 
@@ -333,7 +334,7 @@ The solution must be sorted so that it corresponds to the sequence in KM.q
         mass_matrix=MM,
         specifieds=specified,
         coordinate_derivatives=kin_eqs_solved,  # rhs of kin. diff. equations
-        generator='symjit',
+        generator='cython',
         linear_sys_solver='numpy',
         constants_arg_type='array',
         specifieds_arg_type='array',
@@ -399,7 +400,17 @@ Numerical Integration
 
     t_span = (0.0, intervall)
 
-    resultat1 = solve_ivp(rhs_gen, t_span, y0, t_eval=times, args=(pL_vals,),
+method='Radau' returns non C-contiguous y, so we need a wrapper function.
+
+.. jupyter-execute::
+
+
+    def rhs_gen_wrapper(t, y, pL_vals):
+        y = np.ascontiguousarray(y)
+        return rhs_gen(t, y, pL_vals)
+
+
+    resultat1 = solve_ivp(rhs_gen_wrapper, t_span, y0, t_eval=times, args=(pL_vals,),
                           method='Radau',
                           )
 
@@ -420,7 +431,7 @@ The accelerations needed are calculated numerically and stored in ``RHS``
 
     RHS = np.empty((resultat.shape))
     for i in range(resultat.shape[0]):
-        res = np.array(resultat[i])
+        res = np.ascontiguousarray(resultat[i])
         RHS[i] = rhs_gen(0.0, res, pL_vals)
 
     react_x = np.empty(resultat.shape[0])
