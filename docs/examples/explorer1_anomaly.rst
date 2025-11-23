@@ -57,7 +57,10 @@ Notes
   system must be constant.
 - For the determination of the reaction forces at the connection points the
   accelerations are needed. As generate_ode_function needs C - contiguous
-  arrays if generator='cython' is used, a bit of care must be taken,
+  arrays if generator='cython' is used, a bit of care must be taken.
+- With ``solve_ivp`` some methods, e.g. Radau, return non C-contiguous arrays.
+  Then rhs_gen cannot be used in solve_ivp directy, but a function must be
+  defined which converts the array accordingly.
 - With PyDy Visualisation the axis of a cylinder is always in the Y direction.
   If this was not considered when setting up the system, it must be corrected
   when defining the visualization frames - as it is done here.
@@ -435,7 +438,7 @@ needs the time as second argument.
         mass_matrix=mass_matrix,
         specifieds=specified,
         coordinate_derivatives=kin_eqs_solved,
-        generator='symjit',
+        generator='cython',
         linear_sys_solver='numpy',
         constants_arg_type='array',
         specifieds_arg_type='array',
@@ -611,15 +614,15 @@ Plot Energy and Angular Momentum
 Calculate Reaction Forces on Points, where the Antennas are attached to
 Explorer
 
-Calculate the accelerations needed for the reaction forces. As rhs_gen needs
-C - contiguous arrays if ``generator='cython'`` was used,
-the inputs may have to be converted here accordingly.
+Calculate the accelerations needed for the reaction forces. rhs_gen needs
+C - contiguous arrays if ``generator='cython'`` is used,
+so the inputs have to be converted here accordingly.
 
 .. jupyter-execute::
 
     RHS = np.empty((resultat.shape))
     for i in range(resultat.shape[0]):
-        res_C = resultat[i]
+        res_C = np.ascontiguousarray(resultat[i])
         RHS[i] = rhs_gen(0.0, res_C, pL_vals)
 
     reaction_forces = np.empty((resultat.shape[0], 12))
