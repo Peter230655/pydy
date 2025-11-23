@@ -13,4 +13,5 @@ dependencies:
   - scipy
   - setuptools
   - sphinx
+  - symjit
   - sympy

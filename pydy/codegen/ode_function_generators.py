@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from itertools import chain
 import logging
 from importlib import metadata
+import textwrap
 
 import numpy as np
 import numpy.linalg
@@ -247,17 +248,18 @@ r : dictionary
             The specified exogenous inputs to the system. These should be
             functions of time and the order does not matter.
         linear_sys_solver : string or function
-            Specify either `numpy` or `scipy` to use the linear solvers
+            Specify either ``numpy`` or ``scipy`` to use the linear solvers
             provided in each package or supply a function that solves a linear
-            system Ax=b with the call signature x = solve(A, b). For example,
-            if you need to use custom kwargs for the SciPy solver, pass in a
-            lambda function that wraps the solver and sets them. If `sympy` or
-            `sympy:<method>` is provided, the linear system will be solved
-            symbolically in an efficient manner. `<method>` method can be any
-            valid method for
-            :meth:`sympy.matrices.matrixbase.MatrixBase.solve`, such as `LU`,
-            `CH`, or `CRAMER`. The default is `LU` if only `sympy` is provided.
-            The symbolic solve only works with the Cython generator.
+            system ``Ax=b`` with the call signature ``x = solve(A, b)``. For
+            example, if you need to use custom kwargs for the SciPy solver,
+            pass in a lambda function that wraps the solver and sets them. If
+            ``sympy`` or ``sympy:<method>`` is provided, the linear system will
+            be solved symbolically in an efficient manner. ``<method>`` method
+            can be any valid method for
+            :external+sympy:meth:`~sympy.matrices.matrixbase.MatrixBase.solve`,
+            such as ``LU``, ``CH``, or ``CRAMER``. The default is ``LU`` if
+            only ``sympy`` is provided.  The symbolic solve only works with the
+            Cython generator.
         constants_arg_type : string
             The generated function accepts two different types of arguments
             for the numerical values of the constants: either a ndarray of
@@ -279,10 +281,11 @@ r : dictionary
             slow down for performance critical code. If you know apriori
             what arg types you want to support choose either ``array``,
             ``function``, or ``dictionary``. The speed of each, from fast to
-            slow, are ``array``, ``function``, ``dictionary``, None.\
+            slow, are ``array``, ``function``, ``dictionary``, None.
         time_first : boolean, optional
-            By default the argument order of the generated function is ``rhs(x,
-            t, ...)`` and, if false, it will be ``rhs(t, x, ...)``.
+            By default the argument order of the generated function is ``F(x,
+            t, r, p)`` and, if this is set to true, it will be ``F(t, x, r,
+            p)``.
         """
 
         self.right_hand_side = right_hand_side
@@ -1072,17 +1075,19 @@ def generate_ode_function(*args, **kwargs):
 
 _docstr = ODEFunctionGenerator.__init__.__doc__
 _extra_parameters_doc = \
-"""
-        generator : string or and ODEFunctionGenerator, optional
-            The method used for generating the numeric right hand side. The
-            string options are {'lambdify'|'theano'|'cython'|'symjit'} with
-            'lambdify' being the default. You can also pass in a custom
-            subclass of ODEFunctionGenerator.
+"""\
+generator : string or ODEFunctionGenerator, optional
+    The method used for generating the numeric right hand side. The string
+    options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
+    being the default. You can also pass in a custom subclass of
+    ODEFunctionGenerator.
 
-        Returns
-        =======
-        rhs : function
-            A function which evaluates the derivaties of the states. See the
-            function's docstring for more details after generation.
+Returns
+=======
+rhs : function
+    A function which evaluates the derivaties of the states. See the
+    function's docstring for more details after generation.
 """
-generate_ode_function.__doc__ = ('' * 4 + _docstr + _extra_parameters_doc)
+# NOTE : I do not understand why this ' '*8 is needed.
+generate_ode_function.__doc__ = (textwrap.dedent(' '*8 + _docstr) +
+                                 _extra_parameters_doc)

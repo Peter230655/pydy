@@ -177,8 +177,13 @@ class _CSymbolicLinearSolveGenerator(CMatrixGenerator):
         # NOTE : This assumes the first two items in self.matrices are A and b
         # of and Ax=b system. This also ignores cse=False.
 
+        # NOTE : For large systems this hangs on cse(), the order='none' is set
+        # to drastically improve peformance. This is critical for len(A) > 10
+        # or so!
+
         gen1 = sm.numbered_symbols(prefix)
-        subexprs1, mats_simp = sm.cse(self.matrices, symbols=gen1)
+        subexprs1, mats_simp = sm.cse(self.matrices, symbols=gen1,
+                                      order='none')
 
         A_simp = mats_simp[0]
         b_simp = mats_simp[1]
@@ -186,7 +191,7 @@ class _CSymbolicLinearSolveGenerator(CMatrixGenerator):
         x = sm.Matrix.solve(A_simp, b_simp, method=self.sympy_solver)
 
         gen2 = sm.numbered_symbols(prefix, start=len(subexprs1))
-        subexprs2, x_simp = sm.cse(x, symbols=gen2)
+        subexprs2, x_simp = sm.cse(x, symbols=gen2, order='none')
 
         # swap the b matrix with the x result
         mats_simp[1] = x_simp[0]

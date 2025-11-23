@@ -196,6 +196,28 @@ dx : ndarray, shape(6,)
 """
     assert rhs_func_t_x.__doc__ == expected_t_x_doc
 
+    # NOTE : This has to have the exact wrapping as the docstrings it is
+    # assembled from.
+    expected_end = """\
+time_first : boolean, optional
+    By default the argument order of the generated function is ``F(x,
+    t, r, p)`` and, if this is set to true, it will be ``F(t, x, r,
+    p)``.
+generator : string or ODEFunctionGenerator, optional
+    The method used for generating the numeric right hand side. The string
+    options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
+    being the default. You can also pass in a custom subclass of
+    ODEFunctionGenerator.
+
+Returns
+=======
+rhs : function
+    A function which evaluates the derivaties of the states. See the
+    function's docstring for more details after generation.
+"""
+
+    assert generate_ode_function.__doc__.endswith(expected_end)
+
 
 def test_symbolic_linear_solve_full_mass_matrix():
     sys = models.n_link_pendulum_on_cart(n=5, cart_force=False,
