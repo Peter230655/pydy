@@ -465,9 +465,11 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
 
     for i in range(schritte):
         zeit = times[i]
-        pot_np[i] = pot_lam(*[resultat[i, j] for j in range(resultat.shape[1])],
+        pot_np[i] = pot_lam(*[resultat[i, j]
+                              for j in range(resultat.shape[1])],
                             *pL_vals)
-        kin_np[i] = kin_lam(*[resultat[i, j] for j in range(resultat.shape[1])],
+        kin_np[i] = kin_lam(*[resultat[i, j]
+                              for j in range(resultat.shape[1])],
                             *pL_vals)
         spring_np[i] = spring_lam(*[resultat[i, j]
                                     for j in range(resultat.shape[1])],
