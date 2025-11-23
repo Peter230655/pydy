@@ -483,6 +483,7 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
         print('deviation of total energy from constant is {:.5f} % of max. '
               'total energy'.format((total_max - total_min)/total_max*100))
 
+    times = np.linspace(0., intervall, resultat.shape[0])
     fig, ax = plt.subplots(4, 1, figsize=(8, 10), layout='constrained',
                            sharex=True)
     ax[0].plot(times, pot_np, label='gravitational potential energy')
