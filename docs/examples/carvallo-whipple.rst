@@ -341,12 +341,18 @@ Loads
 Baumgarte's Stabilization
 =========================
 
+The holonomic constraint, the single algebraic equation in the equatiosn of
+motion, will drift during numerical integration. Baumgarte's stabalization
+technique can be used to limit the drift [Baumgarte1972]_. This requires
+manually setting the acceleration level constraint equations in ``KanesMethod``
+with ones that append the Baumgarte force to the holonomic constraint.
+
 .. jupyter-execute::
 
    q = (q1, q2, q3, q4, q5, q6, q7, q8)
    u = (u1, u2, u3, u4, u5, u6, u7, u8)
-   qd_repl = {qi.diff(t): ui for qi, ui in zip(q, u)}
    qdd_repl = {qi.diff(t, 2): ui.diff(t) for qi, ui in zip(q, u)}
+   qd_repl = {qi.diff(t): ui for qi, ui in zip(q, u)}
    acc_con = [c.diff(t).xreplace(qdd_repl).xreplace(qd_repl) for c in nonholonomic]
    alpha = sm.symbols('alpha')
    acc_con[1] = acc_con[1] + 2*alpha*nonholonomic[1] + alpha**2*holonomic
@@ -431,14 +437,14 @@ be dependent. Below, the pitch angle is taken as dependent and solved for using
 .. jupyter-execute::
 
     eval_holonomic = sm.lambdify((q5, q4, q7, d1, d2, d3, rf, rr), holonomic)
-    initial_pitch_angle = float(fsolve(eval_holonomic, 0.0,
-                                       args=(0.0,  # q4
-                                             1e-8,  # q7
-                                             sys.constants[d1],
-                                             sys.constants[d2],
-                                             sys.constants[d3],
-                                             sys.constants[rf],
-                                             sys.constants[rr])))
+    initial_pitch_angle = fsolve(eval_holonomic, 0.0,
+                                 args=(0.0,  # q4
+                                       1e-8,  # q7
+                                       sys.constants[d1],
+                                       sys.constants[d2],
+                                       sys.constants[d3],
+                                       sys.constants[rf],
+                                       sys.constants[rr]))[0]
     np.rad2deg(initial_pitch_angle)
 
 Set all of the initial conditions.
@@ -469,19 +475,12 @@ Generate a time vector over which the integration will be carried out.
 .. jupyter-execute::
 
     fps = 30  # frames per second
-    duration = 6.0  # seconds
+    duration = 10.0  # seconds
     sys.times = np.linspace(0.0, duration, num=int(duration*fps))
 
 The trajectory of the states over time can be found by calling the
 ``.integrate()`` method. But due to the complexity of the equations of motion
 it is helpful to use the ``cython`` generator for faster numerical evaluation.
-
-.. warning::
-
-   The holonomic constraint equation is not explicitly enforced, as PyDy does
-   not yet support integration of differential algebraic equations (DAEs) yet.
-   The solution will drift from the true solution over time with magnitudes
-   dependent on the intiial conditions and constants values.
 
 .. jupyter-execute::
 
@@ -581,6 +580,9 @@ References
    Bicycle." Quarterly Journal of Pure and Applied Mathematics 30 (1899): 312–48.
 .. [Carvallo1899] Carvallo, E. Théorie Du Mouvement Du Monocycle et de La
    Bicyclette. Paris, France: Gauthier- Villars, 1899.
+.. [Baumgarte1972] Baumgarte, J. (1972). Stabilization of Constraints and
+   Integrals of Motion in Dynamical  Systems. Computer Methods in Applied
+   Mechanics and Engineering, 1, 1–16.
 .. [Moore2012] Moore, Jason K. "Human Control of a Bicycle." Doctor of
    Philosophy, University of California, 2012.
    http://moorepants.github.io/dissertation.
