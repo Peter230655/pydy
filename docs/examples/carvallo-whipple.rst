@@ -338,6 +338,21 @@ Loads
 
    loads = [Fco, Fdo, Feo, Ffo, Tc, Td, Te]
 
+Baumgarte's Stabilization
+=========================
+
+The holonomic constraint, the single algebraic equation in the equations of
+motion, will drift during numerical integration. Baumgarte's stabilization
+technique can be used to limit the drift [Baumgarte1972]_. This requires
+manually setting the acceleration level constraint equations in ``KanesMethod``
+with ones that append the Baumgarte force to the holonomic constraint.
+
+.. jupyter-execute::
+
+   acc_constraints = [c.diff(t) for c in nonholonomic]
+   alpha = sm.symbols('alpha')
+   acc_constraints[1] += 2*alpha*nonholonomic[1] + alpha**2*holonomic
+
 Kane's Method
 =============
 
@@ -350,7 +365,8 @@ Kane's Method
                           q_dependent=[q5],  # pitch angle
                           configuration_constraints=[holonomic],
                           u_dependent=[u3, u5, u8],  # yaw rate, pitch rate, front wheel rate
-                          velocity_constraints=nonholonomic)
+                          velocity_constraints=nonholonomic,
+                          acceleration_constraints=acc_constraints)
 
    fr, frstar = kane.kanes_equations(bodies, loads)
 
@@ -397,7 +413,8 @@ states in the form of a dict. The are the benchmark values used in
        ie22: 0.06,
        ie31: 0.009119225261946298,
        ie33: 0.007586622998470264,
-       g: 9.81
+       g: 9.81,
+       alpha: 10.0,
     }
 
 Setup the initial conditions such that the bicycle is traveling at some forward
@@ -416,14 +433,14 @@ be dependent. Below, the pitch angle is taken as dependent and solved for using
 .. jupyter-execute::
 
     eval_holonomic = sm.lambdify((q5, q4, q7, d1, d2, d3, rf, rr), holonomic)
-    initial_pitch_angle = float(fsolve(eval_holonomic, 0.0,
-                                       args=(0.0,  # q4
-                                             1e-8,  # q7
-                                             sys.constants[d1],
-                                             sys.constants[d2],
-                                             sys.constants[d3],
-                                             sys.constants[rf],
-                                             sys.constants[rr])))
+    initial_pitch_angle = fsolve(eval_holonomic, 0.0,
+                                 args=(0.0,  # q4
+                                       1e-8,  # q7
+                                       sys.constants[d1],
+                                       sys.constants[d2],
+                                       sys.constants[d3],
+                                       sys.constants[rf],
+                                       sys.constants[rr]))[0]
     np.rad2deg(initial_pitch_angle)
 
 Set all of the initial conditions.
@@ -454,19 +471,12 @@ Generate a time vector over which the integration will be carried out.
 .. jupyter-execute::
 
     fps = 30  # frames per second
-    duration = 6.0  # seconds
+    duration = 10.0  # seconds
     sys.times = np.linspace(0.0, duration, num=int(duration*fps))
 
 The trajectory of the states over time can be found by calling the
 ``.integrate()`` method. But due to the complexity of the equations of motion
 it is helpful to use the ``cython`` generator for faster numerical evaluation.
-
-.. warning::
-
-   The holonomic constraint equation is not explicitly enforced, as PyDy does
-   not yet support integration of differential algebraic equations (DAEs) yet.
-   The solution will drift from the true solution over time with magnitudes
-   dependent on the intiial conditions and constants values.
 
 .. jupyter-execute::
 
@@ -566,16 +576,19 @@ References
    Bicycle." Quarterly Journal of Pure and Applied Mathematics 30 (1899): 312–48.
 .. [Carvallo1899] Carvallo, E. Théorie Du Mouvement Du Monocycle et de La
    Bicyclette. Paris, France: Gauthier- Villars, 1899.
-.. [Moore2012] Moore, Jason K. "Human Control of a Bicycle." Doctor of
-   Philosophy, University of California, 2012.
-   http://moorepants.github.io/dissertation.
-.. [Meijaard2007] Meijaard, J. P., Jim M. Papadopoulos, Andy Ruina, and A. L.
-   Schwab. "Linearized Dynamics Equations for the Balance and Steer of a
-   Bicycle: A Benchmark and Review." Proceedings of the Royal Society A:
-   Mathematical, Physical and Engineering Sciences 463, no. 2084 (August 8,
-   2007): 1955–82.
+.. [Baumgarte1972] Baumgarte, J. (1972). Stabilization of Constraints and
+   Integrals of Motion in Dynamical  Systems. Computer Methods in Applied
+   Mechanics and Engineering, 1, 1–16.
 .. [Basu-Mandal2007] Basu-Mandal, Pradipta, Anindya Chatterjee, and J.M
    Papadopoulos. "Hands-Free Circular Motions of a Benchmark Bicycle."
    Proceedings of the Royal Society A: Mathematical, Physical and Engineering
    Sciences 463, no. 2084 (August 8, 2007): 1983–2003.
    https://doi.org/10.1098/rspa.2007.1849.
+.. [Meijaard2007] Meijaard, J. P., Jim M. Papadopoulos, Andy Ruina, and A. L.
+   Schwab. "Linearized Dynamics Equations for the Balance and Steer of a
+   Bicycle: A Benchmark and Review." Proceedings of the Royal Society A:
+   Mathematical, Physical and Engineering Sciences 463, no. 2084 (August 8,
+   2007): 1955–82.
+.. [Moore2012] Moore, Jason K. "Human Control of a Bicycle." Doctor of
+   Philosophy, University of California, 2012.
+   http://moorepants.github.io/dissertation.
