@@ -349,13 +349,9 @@ with ones that append the Baumgarte force to the holonomic constraint.
 
 .. jupyter-execute::
 
-   q = (q1, q2, q3, q4, q5, q6, q7, q8)
-   u = (u1, u2, u3, u4, u5, u6, u7, u8)
-   qdd_repl = {qi.diff(t, 2): ui.diff(t) for qi, ui in zip(q, u)}
-   qd_repl = {qi.diff(t): ui for qi, ui in zip(q, u)}
-   acc_con = [c.diff(t).xreplace(qdd_repl).xreplace(qd_repl) for c in nonholonomic]
+   acc_constraints = [c.diff(t) for c in nonholonomic]
    alpha = sm.symbols('alpha')
-   acc_con[1] = acc_con[1] + 2*alpha*nonholonomic[1] + alpha**2*holonomic
+   acc_constraints[1] += 2*alpha*nonholonomic[1] + alpha**2*holonomic
 
 Kane's Method
 =============
@@ -370,7 +366,7 @@ Kane's Method
                           configuration_constraints=[holonomic],
                           u_dependent=[u3, u5, u8],  # yaw rate, pitch rate, front wheel rate
                           velocity_constraints=nonholonomic,
-                          acceleration_constraints=acc_con)
+                          acceleration_constraints=acc_constraints)
 
    fr, frstar = kane.kanes_equations(bodies, loads)
 
