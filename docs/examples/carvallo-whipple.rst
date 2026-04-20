@@ -338,6 +338,19 @@ Loads
 
    loads = [Fco, Fdo, Feo, Ffo, Tc, Td, Te]
 
+Baumgarte's Stabilization
+=========================
+
+.. jupyter-execute::
+
+   q = (q1, q2, q3, q4, q5, q6, q7, q8)
+   u = (u1, u2, u3, u4, u5, u6, u7, u8)
+   qd_repl = {qi.diff(t): ui for qi, ui in zip(q, u)}
+   qdd_repl = {qi.diff(t, 2): ui.diff(t) for qi, ui in zip(q, u)}
+   acc_con = [c.diff(t).xreplace(qdd_repl).xreplace(qd_repl) for c in nonholonomic]
+   alpha = sm.symbols('alpha')
+   acc_con[1] = acc_con[1] + 2*alpha*nonholonomic[1] + alpha**2*holonomic
+
 Kane's Method
 =============
 
@@ -350,7 +363,8 @@ Kane's Method
                           q_dependent=[q5],  # pitch angle
                           configuration_constraints=[holonomic],
                           u_dependent=[u3, u5, u8],  # yaw rate, pitch rate, front wheel rate
-                          velocity_constraints=nonholonomic)
+                          velocity_constraints=nonholonomic,
+                          acceleration_constraints=acc_con)
 
    fr, frstar = kane.kanes_equations(bodies, loads)
 
@@ -397,7 +411,8 @@ states in the form of a dict. The are the benchmark values used in
        ie22: 0.06,
        ie31: 0.009119225261946298,
        ie33: 0.007586622998470264,
-       g: 9.81
+       g: 9.81,
+       alpha: 10.0,
     }
 
 Setup the initial conditions such that the bicycle is traveling at some forward
