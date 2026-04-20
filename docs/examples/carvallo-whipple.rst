@@ -341,8 +341,8 @@ Loads
 Baumgarte's Stabilization
 =========================
 
-The holonomic constraint, the single algebraic equation in the equatiosn of
-motion, will drift during numerical integration. Baumgarte's stabalization
+The holonomic constraint, the single algebraic equation in the equations of
+motion, will drift during numerical integration. Baumgarte's stabilization
 technique can be used to limit the drift [Baumgarte1972]_. This requires
 manually setting the acceleration level constraint equations in ``KanesMethod``
 with ones that append the Baumgarte force to the holonomic constraint.
@@ -579,16 +579,16 @@ References
 .. [Baumgarte1972] Baumgarte, J. (1972). Stabilization of Constraints and
    Integrals of Motion in Dynamical  Systems. Computer Methods in Applied
    Mechanics and Engineering, 1, 1–16.
-.. [Moore2012] Moore, Jason K. "Human Control of a Bicycle." Doctor of
-   Philosophy, University of California, 2012.
-   http://moorepants.github.io/dissertation.
-.. [Meijaard2007] Meijaard, J. P., Jim M. Papadopoulos, Andy Ruina, and A. L.
-   Schwab. "Linearized Dynamics Equations for the Balance and Steer of a
-   Bicycle: A Benchmark and Review." Proceedings of the Royal Society A:
-   Mathematical, Physical and Engineering Sciences 463, no. 2084 (August 8,
-   2007): 1955–82.
 .. [Basu-Mandal2007] Basu-Mandal, Pradipta, Anindya Chatterjee, and J.M
    Papadopoulos. "Hands-Free Circular Motions of a Benchmark Bicycle."
    Proceedings of the Royal Society A: Mathematical, Physical and Engineering
    Sciences 463, no. 2084 (August 8, 2007): 1983–2003.
    https://doi.org/10.1098/rspa.2007.1849.
+.. [Meijaard2007] Meijaard, J. P., Jim M. Papadopoulos, Andy Ruina, and A. L.
+   Schwab. "Linearized Dynamics Equations for the Balance and Steer of a
+   Bicycle: A Benchmark and Review." Proceedings of the Royal Society A:
+   Mathematical, Physical and Engineering Sciences 463, no. 2084 (August 8,
+   2007): 1955–82.
+.. [Moore2012] Moore, Jason K. "Human Control of a Bicycle." Doctor of
+   Philosophy, University of California, 2012.
+   http://moorepants.github.io/dissertation.
