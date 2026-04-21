@@ -5,6 +5,7 @@ Release Notes
 0.9.0.dev0
 ==========
 
+- Theano code generation is deprecated.
 - Drop support for Python 3.9. [PR `#560`_]
 - Add support for Python 3.14. [PR `#560`_]
 - Bump minimum supported dependencies to those available in Ubuntu 24.04 LTS. [PR `#560`_]
