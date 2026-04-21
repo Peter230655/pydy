@@ -757,24 +757,26 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
 
     def __init__(self, *args, **kwargs):
 
-        self._options = {'cse': True}
-
-        for k, v in self._options.items():
-            self._options[k] = kwargs.pop(k, v)
-
-        super(LambdifyODEFunctionGenerator, self).__init__(*args, **kwargs)
-
         # NOTE : pydy.tests.test_system.test_specifying_coordinate_issue_339
         # fails in SymPy 1.12 if cse is True. lambdfiy cse=True has a bug when
         # an argument is a Derivative, see
         # https://github.com/sympy/sympy/issues/26404 dummification. Fixed in
         # this PR which is in SymPy 1.14:
         # https://github.com/sympy/sympy/pull/26678 with origial issue:
-        if any([isinstance(inp, sm.Derivative) for inp in self.inputs]):
+        if (kwargs['specifieds'] is not None and
+                any([isinstance(inp, sm.Derivative)
+                     for inp in kwargs['specifieds']])):
             if sympy_equal_to_or_newer_than('1.14'):
-                pass
+                self._options = {'cse': True}
             else:
                 self._options['cse'] = False
+        else:
+            self._options = {'cse': True}
+
+        for k, v in self._options.items():
+            self._options[k] = kwargs.pop(k, v)
+
+        super(LambdifyODEFunctionGenerator, self).__init__(*args, **kwargs)
 
     __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
 
