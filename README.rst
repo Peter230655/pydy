@@ -98,7 +98,7 @@ and extracted and installed\ [#]_::
 
    $ tar -zxvf pydy-X.X.X.tar.gz
    $ cd pydy-X.X.X
-   $ python setup.py install
+   $ python -m pip install .
 
 .. [#] For system wide installs you may need root permissions (perhaps prepend
    commands with ``sudo``).
@@ -322,11 +322,11 @@ The following installation assumes you have virtualenvwrapper_ in addition to
 virtualenv and all the dependencies needed to build the various packages::
 
    $ mkvirtualenv pydy-dev
-   (pydy-dev)$ pip install numpy scipy cython pytest theano symjit sympy ipython "notebook<5.0" "ipywidgets<5.0" version_information
+   (pydy-dev)$ pip install numpy scipy cython pytest theano symjit sympy ipython notebook ipywidgets version_information pip setuptools
    (pydy-dev)$ pip install matplotlib # make sure to do this after numpy
    (pydy-dev)$ git clone git@github.com:pydy/pydy.git
    (pydy-dev)$ cd pydy
-   (pydy-dev)$ python setup.py develop
+   (pydy-dev)$ python -m pip install -e .
 
 .. _virtualenvwrapper: https://pypi.python.org/pypi/virtualenvwrappe://pypi.python.org/pypi/virtualenvwrapper
 
