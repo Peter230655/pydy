@@ -769,7 +769,7 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
             if sympy_equal_to_or_newer_than('1.14'):
                 self._options = {'cse': True}
             else:
-                self._options['cse'] = False
+                self._options = {'cse': False}
         else:
             self._options = {'cse': True}
 
