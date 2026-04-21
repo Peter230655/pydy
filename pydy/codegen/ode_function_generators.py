@@ -6,6 +6,7 @@ from itertools import chain
 import logging
 from importlib import metadata
 import textwrap
+from warnings import warn
 
 import numpy as np
 import numpy.linalg
@@ -854,6 +855,10 @@ class TheanoODEFunctionGenerator(ODEFunctionGenerator):
         if theano is None:
             raise ImportError('Theano must be installed to use this class.')
         else:
+            msg = ('Support for Theano code generation is deprecated as of '
+                   'PyDy version 0.9.0. It will be removed in a future '
+                   'version.')
+            warn(msg, DeprecationWarning, stacklevel=2)
             super(TheanoODEFunctionGenerator, self).__init__(*args, **kwargs)
 
     __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
