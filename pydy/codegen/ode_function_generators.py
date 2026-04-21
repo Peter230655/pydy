@@ -763,7 +763,7 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
         # https://github.com/sympy/sympy/issues/26404 dummification. Fixed in
         # this PR which is in SymPy 1.14:
         # https://github.com/sympy/sympy/pull/26678 with origial issue:
-        if (kwargs['specifieds'] is not None and
+        if ('specifieds' in kwargs and kwargs['specifieds'] is not None and
                 any([isinstance(inp, sm.Derivative)
                      for inp in kwargs['specifieds']])):
             if sympy_equal_to_or_newer_than('1.14'):
