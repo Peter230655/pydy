@@ -782,28 +782,7 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
     __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
 
     def _lambdify(self, outputs):
-        if sympy_equal_to_or_newer_than('1.11.1'):
-            vec_inputs = self.inputs
-            modules = 'numpy'
-        else:  # TODO : remove this clause when SymPy < 1.11.1 is dropped
-            subs = {}
-            vec_inputs = []
-            if self.specifieds is None:
-                def_vecs = ['q', 'u', 'p']
-            else:
-                def_vecs = ['q', 'u', 'r', 'p']
-
-            for syms, vec_name in zip(self.inputs, def_vecs):
-                v = sm.DeferredVector(vec_name)
-                for i, sym in enumerate(syms):
-                    subs[sym] = v[i]
-                vec_inputs.append(v)
-
-            outputs = [me.msubs(output, subs) for output in outputs]
-
-            modules = [{'ImmutableMatrix': np.array}, 'numpy']
-
-        return sm.lambdify(vec_inputs, outputs, modules=modules,
+        return sm.lambdify(self.inputs, outputs, modules='numpy',
                            cse=self._options['cse'])
 
     def generate_full_rhs_function(self):
