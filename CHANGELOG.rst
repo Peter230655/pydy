@@ -6,9 +6,9 @@ Release Notes
 ==========
 
 - The symbolic linear system solver option is now public and supports selecting
-  optional symbolic linear system solvers. [PR `525`_]
-- Removed more tests and code paths for unsupported SymPy < 1.9. [PRs `522`_,
-  `524`_, `527`_]
+  optional symbolic linear system solvers. [PR `#525`_]
+- Removed more tests and code paths for unsupported SymPy < 1.9. [PRs `#522`_,
+  `#524`_, `#527`_]
 - Moved viz API to a sublevel in the docs instead of top level.
 
 .. _#522: https://github.com/pydy/pydy/pull/522
