@@ -12,6 +12,12 @@ Release Notes
 - Fixed a bug where the lambdify ODE generator would fail if there were
   derivatives in the specifieds when cse was enabled for SymPy 1.12 and SymPy
   1.13. [PR `#560`_]
+- Use Baumgarte's stabilization technique in the Carvallo-Whipple bicycle model
+  example. [PR `#559`_]
+- Added option to swap argument order in the ODEFunctionGenerators to support
+  both SciPy's odeint() and solve_ivp(). [PR `#546`_]
+- Added a SymjitODEFunctionGenerator, depends on symjit >= 2.5.0 (optional).
+  [PR `#530`_]
 - The symbolic linear system solver option is now public and supports selecting
   optional symbolic linear system solvers. [PR `#525`_]
 - Removed more tests and code paths for unsupported SymPy < 1.9. [PRs `#522`_,
@@ -22,6 +28,9 @@ Release Notes
 .. _#524: https://github.com/pydy/pydy/pull/524
 .. _#525: https://github.com/pydy/pydy/pull/525
 .. _#527: https://github.com/pydy/pydy/pull/527
+.. _#530: https://github.com/pydy/pydy/pull/530
+.. _#546: https://github.com/pydy/pydy/pull/546
+.. _#559: https://github.com/pydy/pydy/pull/559
 .. _#560: https://github.com/pydy/pydy/pull/560
 
 0.8.0 (August 28, 2025)
