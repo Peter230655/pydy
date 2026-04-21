@@ -21,12 +21,12 @@ extras_require = {
     'doc': [
         'jupyter_sphinx>=0.3.2',
         'numpydoc>=1.6.0',
-        'pythreejs',  # not in Ubuntu repos
+        'pythreejs>=2.4.2',  # not in Ubuntu repos, 2023-02-20 PyPi release
         'sphinx>=7.2.6',
     ],
     'codegen': [
         'Cython>=0.29.37',  # cython3-legacy
-        'Theano>=1.0.5',  # not in Ubuntu repos
+        'Theano>=1.0.5',  # not in Ubuntu repos, 2020-07-27 PyPi release
         'symjit>=2.5.0',  # not in Ubuntu repos
     ],
     'examples': [
@@ -37,7 +37,7 @@ extras_require = {
 }
 
 if os.name == 'nt':
-    install_requires.append('PyWin32>=303')
+    install_requires.append('PyWin32>=306')  # 2023-03-26 PyPi release
 
 setup(
     name='pydy',

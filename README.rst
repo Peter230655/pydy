@@ -117,7 +117,7 @@ PyDy has hard dependencies on the following software\ [#]_:
 - NumPy_ >= 1.26.4
 - SciPy_ >= 1.11.4
 - SymPy_ >= 1.12
-- PyWin32 >= 303 (Windows Only)
+- PyWin32 >= 306 (Windows Only)
 
 PyDy has optional dependencies for extended code generation on:
 
