@@ -8,6 +8,11 @@ Carvallo-Whipple Bicycle Model
    :jupyter-download:script:`carvallo-whipple` or Jupyter notebook:
    :jupyter-download:notebook:`carvallo-whipple`.
 
+.. warning::
+
+   This example requires SymPy >= 1.13 due to the use of the Cramer's rule
+   linear solver.
+
 This example creates a nonlinear model and simulation of the Carvallo-Whipple
 Bicycle Model ([Carvallo1899]_, [Whipple1899]_). This formulation uses the
 conventions described in [Moore2012]_ which are equivalent to the models
@@ -284,16 +289,12 @@ of ``nonholonomic`` above. It is not a nonholonomic constraint, but we include
 it because we can't easy eliminate a dependent generalized coordinate with
 ``nonholonmic``.
 
-.. warning:: The floating point numerical stability of the solution is affected
-   by the order of the nonholonomic constraint expressions in the following
-   list. If ordered ``A['1'],A['2'],A['3']`` stability degrades.
-
 .. jupyter-execute::
 
    nonholonomic = [
        fn.vel(N).dot(A['1']),
-       fn.vel(N).dot(A['3']),
        fn.vel(N).dot(A['2']),
+       fn.vel(N).dot(A['3']),
    ]
 
 Inertia
@@ -303,10 +304,10 @@ The inertia dyadics are defined with respect to the rear and front frames.
 
 .. jupyter-execute::
 
-   Ic = mec.inertia(C, ic11, ic22, ic33, 0.0, 0.0, ic31)
-   Id = mec.inertia(C, id11, id22, id11, 0.0, 0.0, 0.0)
-   Ie = mec.inertia(E, ie11, ie22, ie33, 0.0, 0.0, ie31)
-   If = mec.inertia(E, if11, if22, if11, 0.0, 0.0, 0.0)
+   Ic = mec.inertia(C, ic11, ic22, ic33, 0, 0, ic31)
+   Id = mec.inertia(C, id11, id22, id11, 0, 0, 0)
+   Ie = mec.inertia(E, ie11, ie22, ie33, 0, 0, ie31)
+   If = mec.inertia(E, if11, if22, if11, 0, 0, 0)
 
 Rigid Bodies
 ============
@@ -351,10 +352,15 @@ with ones that append the Baumgarte force to the holonomic constraint.
 
    acc_constraints = [c.diff(t) for c in nonholonomic]
    alpha = sm.symbols('alpha')
-   acc_constraints[1] += 2*alpha*nonholonomic[1] + alpha**2*holonomic
+   acc_constraints[2] += 2*alpha*nonholonomic[2] + alpha**2*holonomic
 
 Kane's Method
 =============
+
+Provide all of the kinematic information to ``KanesMethod``, selecting the
+three independent generalized speeds. The constraint solver uses the Cramer's
+rule based linear solver to mitigate divide-by-zero issues for the constraint
+equations.
 
 .. jupyter-execute::
 
@@ -366,7 +372,12 @@ Kane's Method
                           configuration_constraints=[holonomic],
                           u_dependent=[u3, u5, u8],  # yaw rate, pitch rate, front wheel rate
                           velocity_constraints=nonholonomic,
-                          acceleration_constraints=acc_constraints)
+                          acceleration_constraints=acc_constraints,
+                          constraint_solver='CRAMER')
+
+Provide the rigid bodies and all loads to generate Kane's equations:
+
+.. jupyter-execute::
 
    fr, frstar = kane.kanes_equations(bodies, loads)
 
@@ -378,7 +389,6 @@ integrate the equations of motion using numerical values of constants.
 
 .. jupyter-execute::
 
-    from pydy.system import System
     sys = System(kane)
 
 Now, we specify the numerical values of the constants and the initial values of
@@ -428,7 +438,8 @@ speeds and has an initial positive roll rate.
 The initial configuration will be the upright equilibrium position. The
 holonomic constraint requires that either the roll, pitch, or steer angle need
 be dependent. Below, the pitch angle is taken as dependent and solved for using
-`fsolve()`. Note that it is equivalent to the steer axis tilt [Meijaard2007]_.
+`fsolve()`. Note that it is equivalent to the steer axis tilt in the nominal
+configuratio shown in [Meijaard2007]_.
 
 .. jupyter-execute::
 
@@ -449,9 +460,6 @@ Set all of the initial conditions.
 
    A divide-by-zero will occur if the steer angle is set to zero. Thus the
    `1e-8` values. The integration is also sensitive to the size of this value.
-   This shouldn't be the case and may point to some errors in the derivation
-   and implementation. More careful attention to the integration tolerances may
-   help too.
 
 .. jupyter-execute::
 
@@ -477,6 +485,9 @@ Generate a time vector over which the integration will be carried out.
 The trajectory of the states over time can be found by calling the
 ``.integrate()`` method. But due to the complexity of the equations of motion
 it is helpful to use the ``cython`` generator for faster numerical evaluation.
+The combination of ``generator='cython'`` and ``linear_sys_solver='sympy'``
+offer the fastest numerical evaluation at the cost of a bit longer generation
+time.
 
 .. jupyter-execute::
 
