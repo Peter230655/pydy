@@ -672,6 +672,7 @@ class CythonODEFunctionGenerator(ODEFunctionGenerator):
             'prefix': 'pydy_codegen',
             'cse': True,
             'verbose': False,
+            'force_ccontiguous': False,
         }
         for k, v in self._options.items():
             self._options[k] = kwargs.pop(k, v)
@@ -705,10 +706,20 @@ class CythonODEFunctionGenerator(ODEFunctionGenerator):
 
     def _set_eval_array(self, f):
 
-        if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: f(q, u, p, *self._empties)
+        # NOTE : The generated Cython function requires C contiguous arrays
+        # and, for example, SciPy's solve_ivp does not guarantee C contiguous
+        # arrays in all of their integration routines. So we take a performance
+        # hit to make a copy of the arrays if they are Fortran contiguous.
+        if self._options['force_ccontiguous']:
+            c = np.ascontiguousarray
         else:
-            self.eval_arrays = lambda q, u, r, p: f(q, u, r, p,
+            c = lambda a: a
+
+        if self.specifieds is None:
+            self.eval_arrays = lambda q, u, p: f(c(q), c(u), c(p),
+                                                 *self._empties)
+        else:
+            self.eval_arrays = lambda q, u, r, p: f(c(q), c(u), c(r), c(p),
                                                     *self._empties)
 
     def generate_full_rhs_function(self):
