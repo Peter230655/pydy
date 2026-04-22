@@ -98,7 +98,7 @@ and extracted and installed\ [#]_::
 
    $ tar -zxvf pydy-X.X.X.tar.gz
    $ cd pydy-X.X.X
-   $ python setup.py install
+   $ python -m pip install .
 
 .. [#] For system wide installs you may need root permissions (perhaps prepend
    commands with ``sudo``).
@@ -109,26 +109,26 @@ Dependencies
 PyDy has hard dependencies on the following software\ [#]_:
 
 .. [#] We only test PyDy with these minimum dependencies; these module versions
-       are provided in the Ubuntu 22.04 packages. Previous versions may work.
+       are provided in the Ubuntu 24.04 packages. Previous versions may work.
 
-- Python >= 3.9
-- setuptools >= 44.1.1
-- packaging >= 21.3
-- NumPy_ >= 1.21.5
-- SciPy_ >= 1.8.0
-- SymPy_ >= 1.9
-- PyWin32 >= 303 (Windows Only)
+- Python >= 3.10
+- setuptools >= 68.1.2
+- packaging >= 24.0
+- NumPy_ >= 1.26.4
+- SciPy_ >= 1.11.4
+- SymPy_ >= 1.12
+- PyWin32 >= 306 (Windows Only)
 
 PyDy has optional dependencies for extended code generation on:
 
-- Cython_ >= 0.29.28
+- Cython_ >= 0.29.37
 - Theano_ >= 1.0.5
 - Symjit_ >= 2.5.0
 
 and animated visualizations with ``Scene.display_jupyter()`` on:
 
-- `Jupyter Notebook`_ >= 6.0.0 or `Jupyter Lab` >= 1.0.0
-- ipywidgets_ >= 6.0.0
+- `Jupyter Notebook`_ >= 6.4.12 or `Jupyter Lab` >= 1.0.0
+- ipywidgets_ >= 8.1.1
 - pythreejs_ >= 2.1.1
 
 or interactive animated visualizations with ``Scene.display_ipython()`` on:
@@ -144,7 +144,7 @@ or interactive animated visualizations with ``Scene.display_ipython()`` on:
 
 The examples may require these dependencies:
 
-- matplotlib_ >= 3.5.1
+- matplotlib_ >= 3.6.3
 - version_information_
 
 .. _version_information: https://pypi.python.org/pypi/version_information
@@ -322,11 +322,11 @@ The following installation assumes you have virtualenvwrapper_ in addition to
 virtualenv and all the dependencies needed to build the various packages::
 
    $ mkvirtualenv pydy-dev
-   (pydy-dev)$ pip install numpy scipy cython pytest theano symjit sympy ipython "notebook<5.0" "ipywidgets<5.0" version_information
+   (pydy-dev)$ pip install numpy scipy cython pytest theano symjit sympy ipython notebook ipywidgets version_information pip setuptools
    (pydy-dev)$ pip install matplotlib # make sure to do this after numpy
    (pydy-dev)$ git clone git@github.com:pydy/pydy.git
    (pydy-dev)$ cd pydy
-   (pydy-dev)$ python setup.py develop
+   (pydy-dev)$ python -m pip install -e .
 
 .. _virtualenvwrapper: https://pypi.python.org/pypi/virtualenvwrappe://pypi.python.org/pypi/virtualenvwrapper
 

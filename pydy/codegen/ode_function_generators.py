@@ -6,6 +6,7 @@ from itertools import chain
 import logging
 from importlib import metadata
 import textwrap
+from warnings import warn
 
 import numpy as np
 import numpy.linalg
@@ -757,7 +758,21 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
 
     def __init__(self, *args, **kwargs):
 
-        self._options = {'cse': True}
+        # NOTE : pydy.tests.test_system.test_specifying_coordinate_issue_339
+        # fails in SymPy 1.12 if cse is True. lambdfiy cse=True has a bug when
+        # an argument is a Derivative, see
+        # https://github.com/sympy/sympy/issues/26404 dummification. Fixed in
+        # this PR which is in SymPy 1.14:
+        # https://github.com/sympy/sympy/pull/26678 with origial issue:
+        if ('specifieds' in kwargs and kwargs['specifieds'] is not None and
+                any([isinstance(inp, sm.Derivative)
+                     for inp in kwargs['specifieds']])):
+            if sympy_equal_to_or_newer_than('1.14'):
+                self._options = {'cse': True}
+            else:
+                self._options = {'cse': False}
+        else:
+            self._options = {'cse': True}
 
         for k, v in self._options.items():
             self._options[k] = kwargs.pop(k, v)
@@ -767,28 +782,7 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
     __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
 
     def _lambdify(self, outputs):
-        if sympy_equal_to_or_newer_than('1.11.1'):
-            vec_inputs = self.inputs
-            modules = 'numpy'
-        else:  # TODO : remove this clause when SymPy < 1.11.1 is dropped
-            subs = {}
-            vec_inputs = []
-            if self.specifieds is None:
-                def_vecs = ['q', 'u', 'p']
-            else:
-                def_vecs = ['q', 'u', 'r', 'p']
-
-            for syms, vec_name in zip(self.inputs, def_vecs):
-                v = sm.DeferredVector(vec_name)
-                for i, sym in enumerate(syms):
-                    subs[sym] = v[i]
-                vec_inputs.append(v)
-
-            outputs = [me.msubs(output, subs) for output in outputs]
-
-            modules = [{'ImmutableMatrix': np.array}, 'numpy']
-
-        return sm.lambdify(vec_inputs, outputs, modules=modules,
+        return sm.lambdify(self.inputs, outputs, modules='numpy',
                            cse=self._options['cse'])
 
     def generate_full_rhs_function(self):
@@ -840,6 +834,10 @@ class TheanoODEFunctionGenerator(ODEFunctionGenerator):
         if theano is None:
             raise ImportError('Theano must be installed to use this class.')
         else:
+            msg = ('Support for Theano code generation is deprecated as of '
+                   'PyDy version 0.9.0. It will be removed in a future '
+                   'version.')
+            warn(msg, DeprecationWarning, stacklevel=2)
             super(TheanoODEFunctionGenerator, self).__init__(*args, **kwargs)
 
     __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
