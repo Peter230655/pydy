@@ -479,7 +479,7 @@ class System(object):
         If the Cython generator is selected and you have a custom
         ``ode_solver`` set, either ensure that solver only passes C contiguous
         arrays to the generated ode function or set the kwarg
-        ``force_ccontiguous`` to ``True``. Forcing C contiguous arrays
+        ``force_c_contiguous`` to ``True``. Forcing C contiguous arrays
         introduces a performance penalty due to the necessity of copying
         arrays.
 
@@ -495,11 +495,11 @@ class System(object):
 
         kwargs.update(self._kwargs_for_gen_ode_func())
 
-        if 'force_ccontiguous' not in kwargs:
+        if 'force_c_contiguous' not in kwargs:
             if 'generator' in kwargs:
                 if (kwargs['generator'] == 'cython' and self.ode_solver is
                         odeint):
-                    kwargs['force_ccontiguous'] = False
+                    kwargs['force_c_contiguous'] = False
                 # NOTE : This ensures that the arrays are forced to be C
                 # contiguous if a user sets an integrator other than odeint,
                 # but only if they are using the Cython generator. There is a
@@ -507,7 +507,7 @@ class System(object):
                 # manually override this to False if they know their ode_solver
                 # choice delivers C contiguous arrays.
                 elif kwargs['generator'] == 'cython':
-                    kwargs['force_ccontiguous'] = True
+                    kwargs['force_c_contiguous'] = True
 
         self._evaluate_ode_function = generate_ode_function(
             *self._args_for_gen_ode_func(),

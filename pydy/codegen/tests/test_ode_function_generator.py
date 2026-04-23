@@ -41,7 +41,7 @@ def test_ccontiguous():
         constants=(a,),
         specifieds=(f1, f2),
         generator='cython',
-        force_ccontiguous=True,
+        force_c_contiguous=True,
     )
 
     arr = np.arange(16, dtype=np.float64).reshape(4, 4)
@@ -52,7 +52,7 @@ def test_ccontiguous():
     )
 
     # Fails with "ValueError: ndarray is not C-contiguous" if
-    # force_ccontiguous=False.
+    # force_c_contiguous=False.
     np.testing.assert_allclose(
         rhs(arr[:, 0], 0.0, np.array([1., 2.]), np.array([1.])),
         np.array([8., 12., 1., 2.]),

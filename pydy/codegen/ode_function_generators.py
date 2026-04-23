@@ -686,7 +686,7 @@ verbose : boolean, optional, default False
 
         self._options = {
             'cse': True,
-            'force_ccontiguous': False,
+            'force_c_contiguous': False,
             'prefix': 'pydy_codegen',
             'tmp_dir': None,
             'verbose': False,
@@ -729,7 +729,7 @@ verbose : boolean, optional, default False
         # and, for example, SciPy's solve_ivp does not guarantee C contiguous
         # arrays in all of their integration routines. So we take a performance
         # hit to make a copy of the arrays if they are Fortran contiguous.
-        if self._options['force_ccontiguous']:
+        if self._options['force_c_contiguous']:
             c = np.ascontiguousarray
         else:
             c = lambda a: a
