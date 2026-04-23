@@ -729,17 +729,21 @@ verbose : boolean, optional, default False
         # and, for example, SciPy's solve_ivp does not guarantee C contiguous
         # arrays in all of their integration routines. So we take a performance
         # hit to make a copy of the arrays if they are Fortran contiguous.
-        if self._options['force_c_contiguous']:
-            c = np.ascontiguousarray
-        else:
-            c = lambda a: a
+        c = np.ascontiguousarray
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: f(c(q), c(u), c(p),
-                                                 *self._empties)
+            if self._options['force_c_contiguous']:
+                self.eval_arrays = lambda q, u, p: f(c(q), c(u), c(p),
+                                                     *self._empties)
+            else:
+                self.eval_arrays = lambda q, u, p: f(q, u, p, *self._empties)
         else:
-            self.eval_arrays = lambda q, u, r, p: f(c(q), c(u), c(r), c(p),
-                                                    *self._empties)
+            if self._options['force_c_contiguous']:
+                self.eval_arrays = lambda q, u, r, p: f(c(q), c(u), c(r), c(p),
+                                                        *self._empties)
+            else:
+                self.eval_arrays = lambda q, u, r, p: f(q, u, r, p,
+                                                        *self._empties)
 
     def generate_full_rhs_function(self):
 
