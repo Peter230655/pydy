@@ -240,6 +240,8 @@ generator : string or ODEFunctionGenerator, optional
     options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
     being the default. You can also pass in a custom subclass of
     ODEFunctionGenerator.
+kwargs
+    Extra keyword arguments are passed to the :py:class:`ODEFunctionGenerator`.
 
 Returns
 =======
