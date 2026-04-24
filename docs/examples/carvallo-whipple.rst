@@ -474,11 +474,6 @@ configuratio shown in [Meijaard2007]_.
 
 Set all of the initial conditions.
 
-.. warning::
-
-   A divide-by-zero will occur if the steer angle is set to zero. Thus the
-   `1e-8` values. The integration is also sensitive to the size of this value.
-
 .. jupyter-execute::
 
     sys.initial_conditions = {q1: 0.0,
