@@ -57,7 +57,7 @@ def check_ode_function_generator_variations(mass_matrix, forcing_vector, kane,
                                     specifieds=symbolics['specified quantities'],
                                     constants_arg_type='array',
                                     specifieds_arg_type='array',
-                                    linear_sys_solver='sympy',
+                                    linear_sys_solver='sympy:CRAMER',
                                     cse=True)
     print('Generating rhs')
     rhs2 = g2.generate()
@@ -69,6 +69,7 @@ def check_ode_function_generator_variations(mass_matrix, forcing_vector, kane,
         # This solves for the right hand side symbolically and generates code
         # from that expression.
         # NOTE : This takes like 12+ hours to compile.
+        # kane.rhs() will cause divide-by-zero, needs cramer_solve.
         g3 = CythonODEFunctionGenerator(kane.rhs(),
                                         kane.q[:],
                                         kane.u[:],
@@ -171,7 +172,8 @@ def check_kanes_equations(symbolics):
         q_dependent=symbolics['dependent generalized coordinates'],
         configuration_constraints=symbolics['holonomic constraints'],
         u_dependent=symbolics['dependent generalized speeds'],
-        velocity_constraints=symbolics['nonholonomic constraints']
+        velocity_constraints=symbolics['nonholonomic constraints'],
+        constraint_solver='CRAMER',  # avoids divide-by-zero !!important!!
     )
     kane.kanes_equations(symbolics['bodies'], loads=symbolics['loads'])
 

@@ -13,6 +13,12 @@ import symengine as se
 TIME = me.dynamicsymbols._t
 
 
+def print_header(msg):
+    print('+'*len(msg))
+    print(msg)
+    print('+'*len(msg))
+
+
 class ReferenceFrame(me.ReferenceFrame):
     """Subclass that enforces the desired unit vector indice style."""
 
@@ -166,7 +172,7 @@ def compare_to_basu_values(exact_vals, float_vals):
                 print('{} was not checked.'.format(k))
             else:
                 try:
-                    np.testing.assert_allclose(bv, mv)
+                    np.testing.assert_allclose(bv, mv, rtol=1e-11)
                 except AssertionError:
                     print(fail_msg.format(k, bv, mv))
                 else:
@@ -175,10 +181,10 @@ def compare_to_basu_values(exact_vals, float_vals):
 
 def compare_numerical_arrays(actual, expected, name='Actual'):
     try:
-        np.testing.assert_allclose(actual, expected)
+        np.testing.assert_allclose(actual, expected, rtol=1e-12, atol=1e-12)
     except AssertionError:
-        print('{} is not correct. Here is the relative error:'.format(name))
-        print((actual - expected)/expected)
+        print('{} is not correct. Here is the error:'.format(name))
+        print(actual - expected)
     else:
         print('{} is correct to machine precision'.format(name))
 
@@ -259,12 +265,12 @@ def evaluate_with_and_without_cse(expr, float_subs, tmp_dir=None):
     num_rows, num_cols = expr.shape
 
     gen_no_cse = CythonMatrixGenerator([args], [expr], cse=False)
-    eval_no_cse = gen_no_cse.compile(tmp_dir=tmp_dir, verbose=True)
+    eval_no_cse = gen_no_cse.compile(tmp_dir=tmp_dir, verbose=False)
     res_no_cse = np.empty(num_rows*num_cols)
     eval_no_cse(vals, res_no_cse)
 
     gen_with_cse = CythonMatrixGenerator([args], [expr], cse=True)
-    eval_with_cse = gen_with_cse.compile(tmp_dir=tmp_dir, verbose=True)
+    eval_with_cse = gen_with_cse.compile(tmp_dir=tmp_dir, verbose=False)
     res_with_cse = np.empty(num_rows*num_cols)
     eval_with_cse(vals, res_with_cse)
 
@@ -570,19 +576,18 @@ def formulate_equations_motion(newtonian_frame,
 
     print('Solving for the dependent generalized speeds')
     A_GuD, B_G = decompose_linear_parts(motion_constraints, uD)
-    uD_of_uI = A_GuD.LUsolve(-B_G)
+    uD_of_uI = A_GuD.cramer_solve(-B_G)  # avoids divide-by-zero, !!important!!
 
     # TODO : For some reason if the below lines are used instead of the above
     # two, I get different results in the final ODE evaluation output for the
     # bicycle. But they seem to compare numerically fine.
-    #AI, AD, BG = decompose_linear_parts(motion_constraints, uI, uD)
-    #uD_of_uI2 = AD.LUsolve(-AI*sm.Matrix(uI) - BG)
-    #compare_numerically(uD_of_uI, uD_of_uI2, n=1000)
+    AI, AD, BG = decompose_linear_parts(motion_constraints, uI, uD)
+    uD_of_uI2 = AD.cramer_solve(-AI*sm.Matrix(uI) - BG)
+    compare_numerically(uD_of_uI, uD_of_uI2, n=1000)
 
     if sub_explicit_gen_dep_speeds:
         uD_repl = dict(zip(uD, uD_of_uI))
     else:
-
         # dependent generalized speeds should be functions of uD(uI, q, t)
         args = tuple(me.find_dynamicsymbols(uD_of_uI))
         print('Partials of the dependent speed expressions with respect to the indepdendent speeds.')
@@ -942,7 +947,7 @@ def solve_for_qdots(generalized_coordinates, generalized_speed_definitions):
     A_Kqd = K.jacobian(qdot)
     B_K = K.xreplace(repl)
 
-    qdot_exprs = A_Kqd.LUsolve(-B_K)
+    qdot_exprs = A_Kqd.cramer_solve(-B_K)
 
     return dict(zip(qdot, qdot_exprs))
 

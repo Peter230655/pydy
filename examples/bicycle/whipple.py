@@ -5,6 +5,14 @@ bicycle model ([Carvallo1899]_, [Whippl1899]_) following the description and
 nomenclature in [Moore2012]_. The resulting equations of motion are compared to
 the canonical values presented in [BasuMandal2007]_.
 
+Requires:
+
+- sympy >=1.13
+- python-symengine
+- dynamicisttoolkit
+- C compiler
+- Fortran compiler
+
 References
 ==========
 
@@ -30,11 +38,6 @@ References
 """
 
 import os
-import sys
-
-# NOTE : temporary hack so that python pydy/examples/bicycle/whipple.py uses
-# the local installed pydy.
-sys.path.append(os.path.dirname(__file__))
 
 from pydy.codegen.ode_function_generators import CythonODEFunctionGenerator
 import numpy as np
@@ -49,7 +52,15 @@ from utils import (
     create_moore_input_from_basu_input,
     decompose_linear_parts,
     evalf_with_symengine,
+    print_header,
     write_matrix_to_file,
+)
+
+from checks import (
+    check_autowrap_against_exact,
+    check_cse,
+    check_kanes_equations,
+    check_xreplace_against_exact,
 )
 
 # NOTE : The default cache size is sometimes too low for these large expression
@@ -179,7 +190,7 @@ def setup_symbolics():
     # T4 : roll torque
     # T6 : rear wheel torque
     # T7 : steer torque
-    T4, T6, T7 = mec.dynamicsymbols('T4 T6 T7')
+    T4, T6, T7 = mec.dynamicsymbols('T4, T6, T7')
 
     ##################
     # Position Vectors
@@ -260,8 +271,7 @@ def setup_symbolics():
     print('Defining linear velocities.')
 
     # rear wheel contact stays in ground plane and does not slip
-    # TODO : Investigate setting to sm.S(0) and 0.
-    dn.set_vel(N, 0.0*N['1'])
+    dn.set_vel(N, 0*N['1'])
 
     # mass centers
     do.v2pt_theory(dn, N, D)
@@ -308,13 +318,10 @@ def setup_symbolics():
     # because there is no direction cosine matrix relating the wheel frames
     # back to the other reference frames so I define them here with respect to
     # the rear and front frames.
-
-    # NOTE : Changing 0.0 to 0 or sm.S(0) changes the floating point errors.
-
-    Ic = mec.inertia(C, ic11, ic22, ic33, 0.0, 0.0, ic31)
-    Id = mec.inertia(C, id11, id22, id11, 0.0, 0.0, 0.0)
-    Ie = mec.inertia(E, ie11, ie22, ie33, 0.0, 0.0, ie31)
-    If = mec.inertia(E, if11, if22, if11, 0.0, 0.0, 0.0)
+    Ic = mec.inertia(C, ic11, ic22, ic33, 0, 0, ic31)
+    Id = mec.inertia(C, id11, id22, id11, 0, 0, 0)
+    Ie = mec.inertia(E, ie11, ie22, ie33, 0, 0, ie31)
+    If = mec.inertia(E, if11, if22, if11, 0, 0, 0)
 
     ##############
     # Rigid Bodies
@@ -403,6 +410,9 @@ def setup_symbolics():
 
     return system_symbolics
 
+
+print_header('Deriving the primary symbolic equations of motion to check.')
+
 symbolics = setup_symbolics()
 
 ###############
@@ -419,8 +429,8 @@ kane = mec.KanesMethod(
     q_dependent=symbolics['dependent generalized coordinates'],
     configuration_constraints=symbolics['holonomic constraints'],
     u_dependent=symbolics['dependent generalized speeds'],
-    velocity_constraints=symbolics['nonholonomic constraints']
-    constraint_solver='CRAMER',  # avoids divide-by-zero
+    velocity_constraints=symbolics['nonholonomic constraints'],
+    constraint_solver='CRAMER',  # avoids divide-by-zero !!important!!
 )
 
 kane.kanes_equations(symbolics['bodies'], loads=symbolics['loads'])
@@ -434,15 +444,17 @@ forcing_vector = kane.forcing.xreplace(kane.kindiffdict())
 print('The forcing vector is a function of these dynamic variables:')
 print(list(sm.ordered(mec.find_dynamicsymbols(forcing_vector))))
 
-#print('Writing mass matrix and forcing vector to files.')
-#write_matrix_to_file(mass_matrix, 'mass_matrix.txt',
-                     #funcs_of_time=kane.q[:] + kane.u[:])
-#write_matrix_to_file(forcing_vector, 'forcing_vector.txt',
-                     #funcs_of_time=kane.q[:] + kane.u[:])
+print('Writing mass matrix and forcing vector to files.')
+write_matrix_to_file(mass_matrix, 'mass_matrix.txt',
+                     funcs_of_time=kane.q[:] + kane.u[:])
+write_matrix_to_file(forcing_vector, 'forcing_vector.txt',
+                     funcs_of_time=kane.q[:] + kane.u[:])
 
 ####################################
 # Validation of non-linear equations
 ####################################
+
+print_header('Checking against Symengine high precision results.')
 
 sub_dicts = create_moore_input_from_basu_input(symbolics)
 substitutions = sub_dicts[0]
@@ -452,6 +464,7 @@ specified_subs = sub_dicts[3]
 moore_input = sub_dicts[4]
 bp = sub_dicts[5]
 
+print('Compare dependendent speeds with Symengine evalf().')
 # ensure that the motion constraints hold for the state inputs
 nonhol = symbolics['nonholonomic constraints']
 u_dep = symbolics['dependent generalized speeds']
@@ -461,7 +474,8 @@ K_num = evalf_with_symengine(K, substitutions)
 G_num = evalf_with_symengine(G, substitutions)
 udep_num = np.squeeze(np.linalg.solve(K_num, -G_num))
 for udi, ud_numi in zip(u_dep, udep_num):
-    print('{:1.14f},{:1.14f}'.format(substitutions[udi], ud_numi))
+    print('{}: {:1.14f},{:1.14f}'.format(str(udi), substitutions[udi],
+                                         ud_numi))
     substitutions[udi] = ud_numi
     dynamic_substitutions[udi] = ud_numi
 
@@ -473,15 +487,17 @@ print('The state derivatives from high precision evaluation:')
 xd_from_sub = np.squeeze(np.linalg.solve(M_exact, F_exact))
 print(xd_from_sub)
 
-#print('Running checks')
-#from checks import check_kanes_equations
+print('Running checks')
+# TODO : My independent calcluation for Kane's method must have an error, so
+# don't run.
 #check_kanes_equations(symbolics)
-#check_xreplace_against_exact(M_exact, F_exact, mass_matrix, forcing_vector,
-                             #substitutions)
-#check_autowrap_against_exact(M_exact, F_exact, mass_matrix, forcing_vector,
-                             #substitutions)
-#check_cse(mass_matrix, forcing_vector, substitutions)
+check_xreplace_against_exact(M_exact, F_exact, mass_matrix, forcing_vector,
+                             substitutions)
+check_autowrap_against_exact(M_exact, F_exact, mass_matrix, forcing_vector,
+                             substitutions)
+check_cse(mass_matrix, forcing_vector, substitutions)
 
+print_header('Checking primary equations of motion versus Basu-Mandal.')
 print('Generating a right hand side function.')
 
 rhs_of_kin_diffs = sm.Matrix([kane.kindiffdict()[k]
