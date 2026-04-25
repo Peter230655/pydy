@@ -572,7 +572,7 @@ class TestODEFunctionGeneratorSubclasses(object):
 
         for Subclass in self.ode_function_subclasses:
             assert (''.join(ODEFunctionGenerator.__init__.__doc__.split()) in
-                    ''.joint(Subclass.__init__.__doc__.split()))
+                    ''.join(Subclass.__init__.__doc__.split()))
 
     def test_generate_full_rhs(self):
 
