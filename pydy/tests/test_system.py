@@ -364,6 +364,24 @@ class TestSystem():
 
         testing.assert_allclose(xd_01, xd_02)
 
+    def test_evaluate_ode(self):
+
+        x = self.sys.evaluate_ode()
+        x_expected = np.array([0.0, 10.3])
+        np.testing.assert_allclose(x, x_expected)
+
+        def force(x, t):
+            f = 5.8*t
+            return f
+
+        # make sure t is passed through
+        self.sys.specifieds = {self.specified_symbol: force}
+        self.sys.initial_conditions = {self.sys.states[0]: 5.1,
+                                       self.sys.states[1]: -4.5}
+        x = self.sys.evaluate_ode(t=1.2)
+        x_expected = np.array([-4.5, 10.58])
+        np.testing.assert_allclose(x, x_expected)
+
     def test_integrate(self):
 
         times = np.linspace(0, 1, 100)
