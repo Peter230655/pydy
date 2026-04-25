@@ -665,12 +665,30 @@ r : dictionary
 
 class CythonODEFunctionGenerator(ODEFunctionGenerator):
 
+    _extra_doc = \
+"""\
+cse : boolean, optional, default True
+    Find and replace common sub-expressions if True.
+force_c_contiguous : boolean, optional, default False
+    Arrays passed to the generated ode function must be C contiguous. If true,
+    all arrays will be coerced into C contiguous arrays at a performance cost.
+prefix : string, optional, default 'pydy_codegen'
+    The desired prefix for the generated files.
+tmp_dir : string, optional, default None
+    The path to an existing or non-existing directory where all of
+    the generated files will be stored.
+verbose : boolean, optional, default False
+    If true the output of the completed compilation steps will be
+    printed.
+"""
+
     def __init__(self, *args, **kwargs):
 
         self._options = {
-            'tmp_dir': None,
-            'prefix': 'pydy_codegen',
             'cse': True,
+            'force_c_contiguous': False,
+            'prefix': 'pydy_codegen',
+            'tmp_dir': None,
             'verbose': False,
         }
         for k, v in self._options.items():
@@ -681,7 +699,9 @@ class CythonODEFunctionGenerator(ODEFunctionGenerator):
         else:
             super(CythonODEFunctionGenerator, self).__init__(*args, **kwargs)
 
-    __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
+    __init__.__doc__ = (textwrap.dedent(' '*8 +
+                                        ODEFunctionGenerator.__init__.__doc__)
+                        + _extra_doc)
 
     def _cythonize(self, outputs, inputs):
         g = CythonMatrixGenerator(inputs, outputs,
@@ -705,11 +725,25 @@ class CythonODEFunctionGenerator(ODEFunctionGenerator):
 
     def _set_eval_array(self, f):
 
+        # NOTE : The generated Cython function requires C contiguous arrays
+        # and, for example, SciPy's solve_ivp does not guarantee C contiguous
+        # arrays in all of their integration routines. So we take a performance
+        # hit to make a copy of the arrays if they are Fortran contiguous.
+        c = np.ascontiguousarray
+
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: f(q, u, p, *self._empties)
+            if self._options['force_c_contiguous']:
+                self.eval_arrays = lambda q, u, p: f(c(q), c(u), c(p),
+                                                     *self._empties)
+            else:
+                self.eval_arrays = lambda q, u, p: f(q, u, p, *self._empties)
         else:
-            self.eval_arrays = lambda q, u, r, p: f(q, u, r, p,
-                                                    *self._empties)
+            if self._options['force_c_contiguous']:
+                self.eval_arrays = lambda q, u, r, p: f(c(q), c(u), c(r), c(p),
+                                                        *self._empties)
+            else:
+                self.eval_arrays = lambda q, u, r, p: f(q, u, r, p,
+                                                        *self._empties)
 
     def generate_full_rhs_function(self):
 
@@ -756,6 +790,12 @@ class CythonODEFunctionGenerator(ODEFunctionGenerator):
 
 class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
 
+    _extra_doc = \
+"""\
+cse : boolean, optional, default True
+    Find and replace common sub-expressions if True.
+"""
+
     def __init__(self, *args, **kwargs):
 
         # NOTE : pydy.tests.test_system.test_specifying_coordinate_issue_339
@@ -779,7 +819,9 @@ class LambdifyODEFunctionGenerator(ODEFunctionGenerator):
 
         super(LambdifyODEFunctionGenerator, self).__init__(*args, **kwargs)
 
-    __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
+    __init__.__doc__ = (textwrap.dedent(' '*8 +
+                                        ODEFunctionGenerator.__init__.__doc__)
+                        + _extra_doc)
 
     def _lambdify(self, outputs):
         return sm.lambdify(self.inputs, outputs, modules='numpy',
@@ -922,6 +964,12 @@ class TheanoODEFunctionGenerator(ODEFunctionGenerator):
 
 class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
+    _extra_doc = \
+"""\
+cse : boolean, optional, default True
+    Find and replace common sub-expressions if True.
+"""
+
     def __init__(self, *args, **kwargs):
 
         if symjit is None:
@@ -938,7 +986,9 @@ class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
         super().__init__(*args, **kwargs)
 
-    __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
+    __init__.__doc__ = (textwrap.dedent(' '*8 +
+                                        ODEFunctionGenerator.__init__.__doc__)
+                        + _extra_doc)
 
     def _symjitify(self, outputs):
         # NOTE : symjit currently only works with expressions made up of
@@ -1079,6 +1129,8 @@ generator : string or ODEFunctionGenerator, optional
     options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
     being the default. You can also pass in a custom subclass of
     ODEFunctionGenerator.
+kwargs
+    Extra keyword arguments are passed to the :py:class:`ODEFunctionGenerator`.
 
 Returns
 =======
