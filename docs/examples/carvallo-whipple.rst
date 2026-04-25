@@ -464,7 +464,7 @@ configuratio shown in [Meijaard2007]_.
     eval_holonomic = sm.lambdify((q5, q4, q7, d1, d2, d3, rf, rr), holonomic)
     initial_pitch_angle = fsolve(eval_holonomic, 0.0,
                                  args=(0.0,  # q4
-                                       1e-8,  # q7
+                                       0.0,  # q7
                                        sys.constants[d1],
                                        sys.constants[d2],
                                        sys.constants[d3],
@@ -474,11 +474,6 @@ configuratio shown in [Meijaard2007]_.
 
 Set all of the initial conditions.
 
-.. warning::
-
-   A divide-by-zero will occur if the steer angle is set to zero. Thus the
-   `1e-8` values. The integration is also sensitive to the size of this value.
-
 .. jupyter-execute::
 
     sys.initial_conditions = {q1: 0.0,
@@ -486,7 +481,7 @@ Set all of the initial conditions.
                               q3: 0.0,
                               q4: 0.0,
                               q5: initial_pitch_angle,
-                              q7: 1e-8,
+                              q7: 0.0,
                               u1: initial_speed,
                               u2: 0.0,
                               u3: 0.0,
@@ -507,13 +502,11 @@ Generate a time vector over which the integration will be carried out.
 The trajectory of the states over time can be found by calling the
 ``.integrate()`` method. But due to the complexity of the equations of motion
 it is helpful to use the ``cython`` generator for faster numerical evaluation.
-The combination of ``generator='cython'`` and ``linear_sys_solver='sympy'``
-offer the fastest numerical evaluation at the cost of a bit longer generation
-time.
 
 .. jupyter-execute::
 
-   sys.generate_ode_function(generator='cython', linear_sys_solver='sympy')
+   sys.generate_ode_function(generator='cython',
+                             linear_sys_solver='sympy:CRAMER')
 
    x_trajectory = sys.integrate()
 
