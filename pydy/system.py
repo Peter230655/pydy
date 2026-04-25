@@ -499,6 +499,7 @@ class System(object):
         self._check_constants(self.constants)
         self._check_specifieds(self.specifieds)
         self._check_initial_conditions(self.initial_conditions)
+        self._check_times(self.times)
 
         if self.evaluate_ode_function is None:
             self.generate_ode_function()
@@ -521,15 +522,9 @@ class System(object):
 
         return initial_conditions_in_proper_order, args
 
-    def evaluate_ode(self, t=0.0):
+    def evaluate_ode(self):
         """Returns the right hand side of the differential equations evaluated
-        at the set initial_conditions and the provided time value.
-
-        Parameters
-        ==========
-        t : float, optional
-            Time at which to evaluate the dynamics. If not provided, a time of
-            zero is used.
+        at the set initial_conditions at the first time value.
 
         Returns
         =======
@@ -545,7 +540,8 @@ class System(object):
 
         """
         x0, args = self._prep_for_evaluate()
-        return self.evaluate_ode_function(np.asarray(x0), t, *args)
+        t0 = self.times[0]
+        return self.evaluate_ode_function(np.asarray(x0), t0, *args)
 
     def integrate(self, **solver_kwargs):
         """Integrates the equations ``evaluate_ode_function()`` using
@@ -572,7 +568,6 @@ class System(object):
             ``ode_solver``.
 
         """
-        self._check_times(self.times)
         x0, args = self._prep_for_evaluate()
 
         x_history = self.ode_solver(
