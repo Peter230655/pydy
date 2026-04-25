@@ -10,6 +10,7 @@ from numpy import testing
 import sympy as sm
 import sympy.physics.mechanics as me
 from scipy.integrate import odeint
+import pytest
 theano = sm.external.import_module('theano')
 Cython = sm.external.import_module('Cython')
 
@@ -452,6 +453,26 @@ class TestSystem():
         else:
             warnings.warn("Cython was not found so the related tests are being"
                           " skipped.", PyDyImportWarning)
+
+    def test_c_contiguous(self):
+
+        def ode_solver(f, x0, t, args=None):
+            a = np.zeros((len(x0), len(x0)))
+            for i in range(len(x0)):
+                a[:, 0] = np.asarray(x0)
+            #print('c', a[0, :].data.c_contiguous)
+            #print('f', a[:, 0].data.f_contiguous)
+            f(a[:, 0], t[0], *args)  # test with f contiguous array
+            return odeint(f, a[:, 0], t, args=args)
+
+        sys = System(self.kane_nlink, ode_solver=ode_solver)
+        sys.times = np.linspace(0.0, 1.0)
+        sys.generate_ode_function(generator='cython', force_c_contiguous=False)
+        with pytest.raises(ValueError):
+            sys.integrate()
+        sys.generate_ode_function(generator='cython')
+        sys.integrate()
+
     def cleanup(self):
         shutil.rmtree(self.tempdirpath)
 
