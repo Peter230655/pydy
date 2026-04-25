@@ -5,6 +5,12 @@ Release Notes
 0.9.0.dev0
 ==========
 
+- Added ``System.evaluate_ode()`` which evaluates the system's differential
+  equations at the set initial condition and initial time. [PR `#566`_]
+- Cython generated ODE functions require C contiguous arrays as inputs. Added
+  an option to coerce Fortran contiguous arrays into C contiguous (at a
+  performance penalty). System() will do the coercion if user supplied ODE
+  solver routines are applied but can be overridden. [PR `#563`_]
 - Theano code generation is deprecated.
 - Drop support for Python 3.9. [PR `#560`_]
 - Add support for Python 3.14. [PR `#560`_]
@@ -32,6 +38,8 @@ Release Notes
 .. _#546: https://github.com/pydy/pydy/pull/546
 .. _#559: https://github.com/pydy/pydy/pull/559
 .. _#560: https://github.com/pydy/pydy/pull/560
+.. _#563: https://github.com/pydy/pydy/pull/563
+.. _#566: https://github.com/pydy/pydy/pull/566
 
 0.8.0 (August 28, 2025)
 =======================
