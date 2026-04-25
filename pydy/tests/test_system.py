@@ -366,6 +366,7 @@ class TestSystem():
 
     def test_evaluate_ode(self):
 
+        self.sys.times = np.array([0.0, 1.0])
         x = self.sys.evaluate_ode()
         x_expected = np.array([0.0, 10.3])
         np.testing.assert_allclose(x, x_expected)
@@ -378,7 +379,7 @@ class TestSystem():
         self.sys.specifieds = {self.specified_symbol: force}
         self.sys.initial_conditions = {self.sys.states[0]: 5.1,
                                        self.sys.states[1]: -4.5}
-        self.times = np.array([1.2, 1.3])
+        self.sys.times = np.array([1.2, 1.3])
         x = self.sys.evaluate_ode()
         x_expected = np.array([-4.5, 10.58])
         np.testing.assert_allclose(x, x_expected)
