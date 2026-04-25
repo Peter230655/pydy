@@ -501,12 +501,24 @@ Generate a time vector over which the integration will be carried out.
 
 The trajectory of the states over time can be found by calling the
 ``.integrate()`` method. But due to the complexity of the equations of motion
-it is helpful to use the ``cython`` generator for faster numerical evaluation.
+it is helpful to use the ``cython`` generator for faster numerical evaluation
+and the symbolic linear solver can also be set to maximize performance as well
+as avoid divide-by-zero issues.
 
 .. jupyter-execute::
 
-   sys.generate_ode_function(generator='cython',
-                             linear_sys_solver='sympy:CRAMER')
+   _ = sys.generate_ode_function(generator='cython',
+                                 linear_sys_solver='sympy:CRAMER')
+
+Test that the initial condition gives a valid result.
+
+.. jupyter-execute::
+
+   sys.evaluate_ode()
+
+Now integrate the equations of motion through time.
+
+.. jupyter-execute::
 
    x_trajectory = sys.integrate()
 
