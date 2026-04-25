@@ -12,9 +12,8 @@
 Objectives
 ----------
 
-- Show how to use ``generate_ode_function`` as an alternative to ``lambdify``
-- Show how to handle non C-contiguous arrays.
-- Show how to use ``PyDy Visualization`` to generate a 3D animation
+- Show how to use ``generate_ode_function``
+- Show how to use ``PyDy Visualization`` to generate a 3D animation.
 
 
 Description
@@ -32,14 +31,6 @@ There may be speed dependent friction between
 the rod and the ball, with coefficient of friction :math:`\textrm{reibung}`.
 A particle with mass :math:`m_1` is attached to each ball.
 
-Notes
------
-
-- ``generate_ode_function`` needs C - contiguous arrays as inputs, if
-  generator = 'cython' is used. If in ``solve_ivp`` method :math:`\neq`'RK45',
-  it will return non C contiguous ``y``. Then ``rhs_gen`` cannot be used
-  directly, but a separate function must be defined, which must contain
-  ``y = np.ascontiguousarray(y)``
 
 .. jupyter-execute::
 
@@ -125,7 +116,7 @@ The lists rot, rot1 are needed for the kinematical equations, see below.
     rot = []
     rot1 = []
 
-It is very important, that the angular speeds be expressed in terms of
+It is important, that the angular speeds be expressed in terms of
 the 'child frame', otherwise the equations of motion become very large.
 
 Note the virtual speeds at P[0], the suspension point.
@@ -188,7 +179,8 @@ Make the list of the bodies.
 Set up the forces.
 
 There are:
-- potential gravitational forces forces
+
+- potential gravitational forces
 - potential spring forces when the balls penetrate each other
 - dissipative friction forces due to friction between rods and balls
 
@@ -220,7 +212,7 @@ Note how the reaction forces at P[0] are set up.
 
 Kinematic equations.
 
-Again it is very important that the frames A[i] be used below. Otherwise
+Again it is advantageous that the frames A[i] be used below. Otherwise
 the equations of motion become very large. Note how rot, rot1 from above
 are used.
 
@@ -256,8 +248,7 @@ time consuming.
                                            for i in range(len(u))})
 
 
-``generate_ode_function`` needs the mass matrix and the forcing. The
-kinematic differential equations to be supplied separately.
+``generate_ode_function`` needs the mass matrix and the force.
 
 .. jupyter-execute::
 
@@ -315,16 +306,11 @@ Compilation
     specified = None
     constants = np.array(pL)
 
-The kinematic equations must be solved for the derivatives of the coordinates.
-The solution must be sorted so that it corresponds to the sequence in KM.q
+Create the right hand side for the numerical integration.
 
 .. jupyter-execute::
 
-    kd = sm.Matrix(kd)
-    loesung = sm.solve(kd, [q[i].diff(t) for i in range(3 * n)])
-
-    schluessel = [i.diff(t) for i in KM.q]
-    kin_eqs_solved = sm.Matrix([loesung[i] for i in schluessel])
+    kd_dict = KM.kindiffdict()
 
     rhs_gen = generate_ode_function(
         force,
@@ -333,12 +319,13 @@ The solution must be sorted so that it corresponds to the sequence in KM.q
         constants=constants,
         mass_matrix=MM,
         specifieds=specified,
-        coordinate_derivatives=kin_eqs_solved,  # rhs of kin. diff. equations
+        coordinate_derivatives=sm.Matrix([kd_dict[i] for i in kd_dict.keys()]),
         generator='cython',
         linear_sys_solver='numpy',
         constants_arg_type='array',
         specifieds_arg_type='array',
         time_first='True',
+        force_c_contiguous=True,
     )
 
 Below lambdify is used as speed is of no concern.
@@ -400,22 +387,19 @@ Numerical Integration
 
     t_span = (0.0, intervall)
 
-method='Radau' returns non C-contiguous y, so we need a wrapper function.
+Numerical integration.
 
 .. jupyter-execute::
 
-
-    def rhs_gen_wrapper(t, y, pL_vals):
-        y = np.ascontiguousarray(y)
-        return rhs_gen(t, y, pL_vals)
-
-
-    resultat1 = solve_ivp(rhs_gen_wrapper, t_span, y0, t_eval=times, args=(pL_vals,),
+    resultat1 = solve_ivp(rhs_gen, t_span, y0, t_eval=times, args=(pL_vals,),
                           method='Radau',
+                          atol=1e-6,
+                          rtol=1e-6,
                           )
 
     resultat = resultat1.y.T
 
+    print(resultat1.message)
     print('Shape of resultat', resultat.shape)
     print(f"To numerically integrate an intervall of {intervall:.3f} sec "
           f"the routine cycled {resultat1.nfev:,} times")
@@ -431,8 +415,7 @@ The accelerations needed are calculated numerically and stored in ``RHS``
 
     RHS = np.empty((resultat.shape))
     for i in range(resultat.shape[0]):
-        res = np.ascontiguousarray(resultat[i])
-        RHS[i] = rhs_gen(0.0, res, pL_vals)
+        RHS[i] = rhs_gen(0.0, resultat[i], pL_vals)
 
     react_x = np.empty(resultat.shape[0])
     react_y = np.empty(resultat.shape[0])
