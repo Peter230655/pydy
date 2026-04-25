@@ -2,9 +2,11 @@
 
 # external
 import numpy as np
+import pytest
+
 from sympy import symbols
 from numpy.testing import assert_allclose
-from nose.tools import assert_raises
+
 try:
     import pythreejs as p3js
 except ImportError:
@@ -12,7 +14,7 @@ except ImportError:
     p3js = None
 
 # local
-from ..shapes import (Shape, Cube, Cylinder, Cone, Sphere, Circle, Plane,
+from ..shapes import (Shape, Box, Cube, Cylinder, Cone, Sphere, Circle, Plane,
                       Tetrahedron, Octahedron, Icosahedron, Torus, Tube,
                       TorusKnot)
 
@@ -29,19 +31,19 @@ def test_shape():
 
     shape.name = 'shape1'
     assert shape.name == 'shape1'
-    with assert_raises(TypeError):
+    with pytest.raises(TypeError):
         shape.name = 1
 
     shape.color = 'red'
     assert shape.color == 'red'
-    with assert_raises(ValueError):
+    with pytest.raises(ValueError):
         shape.color = 'puke'
 
     shape.material = "water"
     assert shape.material == "water"
     shape.material = "WATER"
     assert shape.material == "WATER"
-    with assert_raises(ValueError):
+    with pytest.raises(ValueError):
         shape.material = 'fluffy cloth'
 
     assert shape.generate_dict() == {"color": "red",
@@ -83,6 +85,28 @@ def test_shape_geometry_with_expressions():
     actual = shape.generate_dict(constant_map={symbols('l1'): 4.0,
                                                symbols('l2'): 4.0})
     assert actual == expected
+
+
+def test_box():
+
+    box = Box(10.0, 20.0, 30.0, name='box', color='blue', material="WATER")
+
+    assert box.name == 'box'
+    assert box.__str__() == 'Box box color:blue material:WATER depth:30.0 height:20.0 width:10.0'
+    assert box.__repr__() == 'Box'
+    assert box.width == 10.0
+    assert box.height == 20.0
+    assert box.depth == 30.0
+    assert box.color == 'blue'
+
+    if p3js is not None:
+        mesh = box._p3js_mesh()
+        expected_mesh = p3js.Mesh(p3js.BoxBufferGeometry(width=10.0,
+                                                         height=20.0,
+                                                         depth=30.0),
+                                  p3js.MeshStandardMaterial(color='blue'),
+                                  name='box')
+        assert repr(mesh) == repr(expected_mesh)
 
 
 def test_cube():

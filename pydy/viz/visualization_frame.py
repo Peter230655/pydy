@@ -1,10 +1,7 @@
 __all__ = ['VisualizationFrame']
 
 import sys
-if sys.version_info < (3, 0):
-    from collections import Iterator
-else:
-    from collections.abc import Iterator
+from collections.abc import Iterator
 import numpy as np
 from sympy import Dummy, lambdify
 from sympy.matrices.expressions import Identity
@@ -15,7 +12,6 @@ except ImportError:
     p3js = None
 
 from .shapes import Shape
-from ..utils import sympy_equal_to_or_newer_than
 
 
 class VisualizationFrame(object):
@@ -109,10 +105,7 @@ class VisualizationFrame(object):
             self.name = 'unnamed'
 
         try:
-            if sympy_equal_to_or_newer_than('1.0'):
-                self.reference_frame = args[i].frame
-            else:
-                self.reference_frame = args[i].get_frame()
+            self.reference_frame = args[i].frame
             self.origin = args[i].masscenter
 
         except AttributeError:

@@ -7,12 +7,14 @@ Here is the procedure for using this class.
 
     1. specify your options either via the constructor or via the
        attributes.
-    2. optionally, call ``generate_ode_function()`` if you want to customize
-       how the ODE function is generated.
-    3. call ``integrate()`` to simulate your system.
+    2. optionally, call :py:meth:`~pydy.system.System.generate_ode_function` if
+       you want to customize how the ODE function is generated.
+    3. call :py:meth:`~pydy.system.System.integrate` to simulate your system.
 
 The simplest usage of this class is as follows. First, we need a
-KanesMethod object on which we have already invoked ``kanes_equations()``::
+:external+sympy:py:class:`~sympy.physics.mechanics.kane.KanesMethod` object on
+which we have already invoked
+:external+sympy:py:meth:`~sympy.physics.mechanics.kane.KanesMethod.kanes_equations`::
 
     km = KanesMethod(...)
     km.kanes_equations(force_list, body_list)
@@ -53,8 +55,7 @@ from itertools import repeat
 
 import numpy as np
 import sympy as sm
-from sympy.physics.mechanics import dynamicsymbols
-from sympy.physics.mechanics.functions import find_dynamicsymbols
+from sympy.physics.mechanics import dynamicsymbols, find_dynamicsymbols
 from scipy.integrate import odeint
 
 from .codegen.ode_function_generators import generate_ode_function
@@ -420,7 +421,7 @@ class System(object):
 
         """
 
-        args = (self.eom_method.forcing_full,
+        args = (self.eom_method.forcing,
                 self.coordinates,
                 self.speeds,
                 self.constants_symbols)
@@ -443,8 +444,15 @@ class System(object):
         if not specifieds:
             specifieds = None
 
-        kwargs = {'mass_matrix': self.eom_method.mass_matrix_full,
-                  'specifieds': specifieds}
+        kin_diff_dict = self.eom_method.kindiffdict()
+        kin_diff_rhs = sm.Matrix([kin_diff_dict[q.diff()] for q in
+                                  self.coordinates])
+
+        kwargs = {
+            'mass_matrix': self.eom_method.mass_matrix,
+            'coordinate_derivatives': kin_diff_rhs,
+            'specifieds': specifieds,
+        }
 
         return kwargs
 

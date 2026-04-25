@@ -1,0 +1,29 @@
+# This environment will install all the necessary dependencies to run the
+# development version of PyDy, execute the tests, run the examples, and build
+# the documentation. After the environment is activated, you can install the
+# development version of PyDy into this environment with:
+#
+# `pip install --no-deps -e .`
+#
+name: pydy-dev
+channels:
+  - conda-forge
+dependencies:
+  - coverage
+  - cython
+  - ipython
+  - ipywidgets
+  - jupyter
+  - jupyter_sphinx
+  - jupyterlab
+  - matplotlib
+  - numpy
+  - numpydoc
+  - packaging
+  - pydy
+  - pytest
+  - python=3.*
+  - pythreejs
+  - sphinx
+  - symjit
+  - sympy

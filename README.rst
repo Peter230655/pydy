@@ -2,7 +2,7 @@
 PyDy
 ====
 
-|pypi| |anaconda| |rtd-docs| |travis-build| |appveyor| |gitter|
+|pypi| |anaconda| |rtd-docs| |github-build|
 
 .. |pypi| image:: https://img.shields.io/pypi/v/pydy.svg
    :target: https://pypi.python.org/pypi/pydy
@@ -15,20 +15,13 @@ PyDy
    :target: https://pydy.readthedocs.io/en/stable/?badge=stable
    :alt: Documentation Status
 
-.. |travis-build| image:: https://travis-ci.org/pydy/pydy.png?branch=master
-   :target: https://travis-ci.org/pydy/pydy
-
-.. |appveyor| image:: https://ci.appveyor.com/api/projects/status/orj87gyb0c1wqc6j/branch/master?svg=true
-   :target: https://ci.appveyor.com/project/moorepants/pydy/branch/master
-
-.. |gitter| image:: https://badges.gitter.im/Join%20Chat.svg
-   :target: https://gitter.im/pydy/pydy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+.. |github-build| image:: https://github.com/pydy/pydy/actions/workflows/tests.yml/badge.svg
+   :target: https://github.com/pydy/pydy/actions
 
 PyDy_, short for Python Dynamics, is a tool kit written in the Python
 programming language that utilizes an array of scientific programs to enable
-the study of multibody dynamics. The goal is to have a modular framework and
-eventually a physics abstraction layer which utilizes a variety of backends
-that can provide the user with their desired workflow, including:
+the study of multibody dynamics. The goal is to have a modular framework that
+can provide the user with their desired workflow, including:
 
 - Model specification
 - Equation of motion generation
@@ -105,7 +98,7 @@ and extracted and installed\ [#]_::
 
    $ tar -zxvf pydy-X.X.X.tar.gz
    $ cd pydy-X.X.X
-   $ python setup.py install
+   $ python -m pip install .
 
 .. [#] For system wide installs you may need root permissions (perhaps prepend
    commands with ``sudo``).
@@ -116,24 +109,26 @@ Dependencies
 PyDy has hard dependencies on the following software\ [#]_:
 
 .. [#] We only test PyDy with these minimum dependencies; these module versions
-       are provided in the Ubuntu 20.04 packages. Previous versions may work.
+       are provided in the Ubuntu 24.04 packages. Previous versions may work.
 
-- 2.7 <= Python < 3.0 or Python >= 3.6
-- setuptools >= 20.7.0
-- NumPy_ >= 1.16.5
-- SciPy_ >= 1.3.3
-- SymPy_ >= 1.5.1
-- PyWin32 >= 219 (Windows Only)
+- Python >= 3.10
+- setuptools >= 68.1.2
+- packaging >= 24.0
+- NumPy_ >= 1.26.4
+- SciPy_ >= 1.11.4
+- SymPy_ >= 1.12
+- PyWin32 >= 306 (Windows Only)
 
 PyDy has optional dependencies for extended code generation on:
 
-- Cython_ >= 0.29.14
-- Theano_ >= 1.0.4
+- Cython_ >= 0.29.37
+- Theano_ >= 1.0.5
+- Symjit_ >= 2.5.0
 
 and animated visualizations with ``Scene.display_jupyter()`` on:
 
-- `Jupyter Notebook`_ >= 6.0.0 or `Jupyter Lab` >= 1.0.0
-- ipywidgets_ >= 6.0.0
+- `Jupyter Notebook`_ >= 6.4.12 or `Jupyter Lab` >= 1.0.0
+- ipywidgets_ >= 8.1.1
 - pythreejs_ >= 2.1.1
 
 or interactive animated visualizations with ``Scene.display_ipython()`` on:
@@ -143,12 +138,13 @@ or interactive animated visualizations with ``Scene.display_ipython()`` on:
 
 .. _Cython: http://cython.org/
 .. _Theano: http://deeplearning.net/software/theano/
+.. _Symjit: https://github.com/siravan/symjit
 .. _Jupyter Notebook: https://jupyter-notebook.readthedocs.io
 .. _Jupyter Lab: https://jupyterlab.readthedocs.io
 
 The examples may require these dependencies:
 
-- matplotlib_ >= 3.1.2
+- matplotlib_ >= 3.6.3
 - version_information_
 
 .. _version_information: https://pypi.python.org/pypi/version_information
@@ -274,8 +270,8 @@ Code Generation (codegen)
 
 This package provides code generation facilities. It generates functions that
 can numerically evaluate the right hand side of the ordinary differential
-equations generated with sympy.physics.mechanics_ with three different
-backends: SymPy's lambdify_, Theano, and Cython.
+equations generated with sympy.physics.mechanics_ with four different
+backends: SymPy's lambdify_, Theano, Cython, and Symjit.
 
 .. _sympy.physics.mechanics: http://docs.sympy.org/latest/modules/physics/mechanics
 .. _lambdify: http://docs.sympy.org/latest/modules/utilities/lambdify.html#sympy.utilities.lambdify.lambdify
@@ -309,10 +305,9 @@ repository from Github with::
 
 You should then install the dependencies for running the tests:
 
-- nose_: 1.3.7
+- pytest
 - phantomjs_: 1.9.0
 
-.. _nose: https://nose.readthedocs.org
 .. _phantomjs: http://phantomjs.org
 
 Isolated Environments
@@ -327,17 +322,17 @@ The following installation assumes you have virtualenvwrapper_ in addition to
 virtualenv and all the dependencies needed to build the various packages::
 
    $ mkvirtualenv pydy-dev
-   (pydy-dev)$ pip install numpy scipy cython nose theano sympy ipython "notebook<5.0" "ipywidgets<5.0" version_information
+   (pydy-dev)$ pip install numpy scipy cython pytest theano symjit sympy ipython notebook ipywidgets version_information pip setuptools
    (pydy-dev)$ pip install matplotlib # make sure to do this after numpy
    (pydy-dev)$ git clone git@github.com:pydy/pydy.git
    (pydy-dev)$ cd pydy
-   (pydy-dev)$ python setup.py develop
+   (pydy-dev)$ python -m pip install -e .
 
 .. _virtualenvwrapper: https://pypi.python.org/pypi/virtualenvwrappe://pypi.python.org/pypi/virtualenvwrapper
 
 Or with conda_::
 
-   $ conda create -c pydy -n pydy-dev setuptools numpy scipy ipython "notebook<5.0" "ipywidgets<5.0" cython nose theano sympy matplotlib version_information
+   $ conda create -c pydy -n pydy-dev setuptools numpy scipy ipython "notebook<5.0" "ipywidgets<5.0" cython pytest theano symjit sympy matplotlib version_information
    $ source activate pydy-dev
    (pydy-dev)$ git clone git@github.com:pydy/pydy.git
    (pydy-dev)$ cd pydy
@@ -345,7 +340,7 @@ Or with conda_::
 
 The full Python test suite can be run with::
 
-   (pydy-dev)$ nosetests
+   (pydy-dev)$ pytest pydy/
 
 For the JavaScript tests the Jasmine and blanket.js libraries are used. Both
 of these libraries are included in pydy.viz with the source. To run the
@@ -358,7 +353,7 @@ Benchmark
 
 Run the benchmark to test the n-link pendulum problem with the various backends::
 
-   $ python bin/benchmark_pydy_code_gen.py <max # of links> <# of time steps>
+   $ python bin/benchmark_pydy_code_gen.py <max # of links> <# of time steps> <duration>
 
 Citation
 ========
@@ -373,14 +368,20 @@ publications or on the web. This citation can be used:
    Conference, 2013, `10.1115/DETC2013-13470
    <http://dx.doi.org/10.1115/DETC2013-13470>`_.
 
+
+.. raw:: html
+
+   <p>PyDy is built by (made with <a
+   href="https://contrib.rocks">contrib.rocks</a> :</p>
+   <a href="https://github.com/pydy/pydy/graphs/contributors"><img src="https://contrib.rocks/image?repo=pydy/pydy"></a>
+
 Questions, Bugs, Feature Requests
 =================================
 
 If you have any question about installation, usage, etc, feel free send a
-message to our public `mailing list`_ or visit our `Gitter chatroom`_.
+message to our public `mailing list`_.
 
 .. _mailing list: http://groups.google.com/group/pydy
-.. _Gitter chatroom: https://gitter.im/pydy/pydy
 
 If you think there’s a bug or you would like to request a feature, please open
 an `issue`_ on Github.
@@ -393,9 +394,9 @@ Related Packages
 These are various related and similar Python packages:
 
 - https://github.com/cdsousa/sympybotics
-- https://pypi.python.org/pypi/Hamilton
-- https://pypi.python.org/pypi/arboris
-- https://pypi.python.org/pypi/PyODE
-- https://pypi.python.org/pypi/odeViz
 - https://pypi.python.org/pypi/ARS
+- https://pypi.python.org/pypi/Hamilton
+- https://pypi.python.org/pypi/PyODE
+- https://pypi.python.org/pypi/arboris
+- https://pypi.python.org/pypi/odeViz
 - https://pypi.python.org/pypi/pymunk

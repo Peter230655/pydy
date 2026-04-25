@@ -2,38 +2,42 @@
 # -*- coding: utf-8 -*-
 
 import os
-import sys
 
 from setuptools import setup, find_packages
 
 exec(open('pydy/version.py').read())
 
-if sys.version_info[0] < 3:  # Python 2
-    install_requires = ['numpy<1.17',
-                        'scipy<1.3',
-                        'sympy<1.6']
-    extras_require = {'doc': ['sphinx<2',
-                              'numpydoc<1'],
-                      'codegen': ['Cython>=0.29.14',
-                                  'Theano>=1.0.4'],
-                      'examples': ['matplotlib<3',
-                                   'notebook>=4.0.0,<5.0.0',
-                                   'ipywidgets>=4.0.0,<5.0.0'],
-                      }
-else:  # Python 3
-    install_requires = ['numpy>=1.16.5',
-                        'scipy>=1.3.3',
-                        'sympy>=1.5.1']
-    extras_require = {'doc': ['sphinx', 'numpydoc'],
-                      'codegen': ['Cython>=0.29.14',
-                                  'Theano>=1.0.4'],
-                      'examples': ['matplotlib>=3.1.2',
-                                   'notebook>=4.0.0,<5.0.0',
-                                   'ipywidgets>=4.0.0,<5.0.0'],
-                      }
+# The lower bounds for the dependencies match those in Ubuntu 24.04 LTS.
+
+install_requires = [
+    'numpy>=1.26.4',
+    'packaging>=24.0',
+    'scipy>=1.11.4',
+    'setuptools>=68.1.2',
+    'sympy>=1.12',
+]
+
+extras_require = {
+    'doc': [
+        'jupyter_sphinx>=0.3.2',
+        'numpydoc>=1.6.0',
+        'pythreejs>=2.4.2',  # not in Ubuntu repos, 2023-02-20 PyPi release
+        'sphinx>=7.2.6',
+    ],
+    'codegen': [
+        'Cython>=0.29.37',  # cython3-legacy
+        'Theano>=1.0.5',  # not in Ubuntu repos, 2020-07-27 PyPi release
+        'symjit>=2.5.0',  # not in Ubuntu repos
+    ],
+    'examples': [
+        'ipywidgets>=8.1.1',  # for display_ipython()
+        'matplotlib>=3.6.3',
+        'notebook>=6.4.12',  # for display_ipython()
+    ],
+}
 
 if os.name == 'nt':
-    install_requires.append('PyWin32>=219')
+    install_requires.append('PyWin32>=306')  # 2023-03-26 PyPi release
 
 setup(
     name='pydy',
@@ -48,16 +52,17 @@ setup(
     packages=find_packages(),
     install_requires=install_requires,
     extras_require=extras_require,
-    tests_require=['nose>=1.3.7'],
-    test_suite='nose.collector',
+    tests_require=['pytest'],
     include_package_data=True,
-    classifiers=['Development Status :: 4 - Beta',
-                 'Intended Audience :: Science/Research',
-                 'Operating System :: OS Independent',
-                 'Programming Language :: Python :: 2.7',
-                 'Programming Language :: Python :: 3.6',
-                 'Programming Language :: Python :: 3.7',
-                 'Programming Language :: Python :: 3.8',
-                 'Topic :: Scientific/Engineering :: Physics',
-                 ],
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Science/Research',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
+        'Programming Language :: Python :: 3.14',
+        'Topic :: Scientific/Engineering :: Physics',
+    ],
 )

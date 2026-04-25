@@ -12,7 +12,7 @@ import datetime
 from collections import OrderedDict
 
 # external
-from pkg_resources import parse_version
+from packaging.version import parse as parse_version
 import numpy as np
 from sympy import latex
 from sympy.physics.mechanics import ReferenceFrame, Point, dynamicsymbols
@@ -28,8 +28,7 @@ from .light import PointLight
 from ..system import System
 from ..utils import PyDyImportWarning
 
-if sys.version_info > (3, 0):
-    raw_input = input
+raw_input = input
 
 __all__ = ['Scene']
 
@@ -517,7 +516,8 @@ class Scene(object):
                                  controls=[controller],
                                  width=view_width, height=view_height)
 
-        clip = p3js.AnimationClip(tracks=self._tracks, duration=self.times[-1])
+        clip = p3js.AnimationClip(tracks=self._tracks,
+                                  duration=self.times[-1] - self.times[0])
         action = p3js.AnimationAction(p3js.AnimationMixer(scene), clip, scene)
 
         return widgets.VBox([action, renderer])

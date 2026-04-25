@@ -2,9 +2,97 @@
 Release Notes
 =============
 
-0.6.0 (TBA)
-===========
+0.9.0.dev0
+==========
 
+- Theano code generation is deprecated.
+- Drop support for Python 3.9. [PR `#560`_]
+- Add support for Python 3.14. [PR `#560`_]
+- Bump minimum supported dependencies to those available in Ubuntu 24.04 LTS. [PR `#560`_]
+- Fixed a bug where the lambdify ODE generator would fail if there were
+  derivatives in the specifieds when cse was enabled for SymPy 1.12 and SymPy
+  1.13. [PR `#560`_]
+- Use Baumgarte's stabilization technique in the Carvallo-Whipple bicycle model
+  example. [PR `#559`_]
+- Added option to swap argument order in the ODEFunctionGenerators to support
+  both SciPy's odeint() and solve_ivp(). [PR `#546`_]
+- Added a SymjitODEFunctionGenerator, depends on symjit >= 2.5.0 (optional).
+  [PR `#530`_]
+- The symbolic linear system solver option is now public and supports selecting
+  optional symbolic linear system solvers. [PR `#525`_]
+- Removed more tests and code paths for unsupported SymPy < 1.9. [PRs `#522`_,
+  `#524`_, `#527`_]
+- Moved viz API to a sublevel in the docs instead of top level.
+
+.. _#522: https://github.com/pydy/pydy/pull/522
+.. _#524: https://github.com/pydy/pydy/pull/524
+.. _#525: https://github.com/pydy/pydy/pull/525
+.. _#527: https://github.com/pydy/pydy/pull/527
+.. _#530: https://github.com/pydy/pydy/pull/530
+.. _#546: https://github.com/pydy/pydy/pull/546
+.. _#559: https://github.com/pydy/pydy/pull/559
+.. _#560: https://github.com/pydy/pydy/pull/560
+
+0.8.0 (August 28, 2025)
+=======================
+
+- Support NumPy 2.0. [PR `#502`_]
+- Migrate from nose to pytest. [PR `#503`_]
+- Bump minimum dependency versions to match those in Ubuntu 22.04 LTS and drop
+  support for Python 3.8. [PR `#504`_]
+- Update benchmark script to run without optional dependencies. [PR `#505`_]
+- Fixed bug where incorrect specified arguments were being selected if using
+  functions for specifieds. [PR `#510`_]
+- Support math symbols in C compilation on Windows. [PR `#511`_]
+- Add support for Python 3.13. [PR `#512`_]
+- Add dependency on packaging package for version parsing and comparison (in
+  place of deprecated pkg_resources). [PR `#514`_]
+- Make argument checking optional the MatrixGenerator due to low performance on
+  large expressions. [PR `#515`_]
+
+.. _#502: https://github.com/pydy/pydy/pull/502
+.. _#503: https://github.com/pydy/pydy/pull/503
+.. _#504: https://github.com/pydy/pydy/pull/504
+.. _#505: https://github.com/pydy/pydy/pull/505
+.. _#510: https://github.com/pydy/pydy/pull/510
+.. _#511: https://github.com/pydy/pydy/pull/511
+.. _#512: https://github.com/pydy/pydy/pull/512
+.. _#514: https://github.com/pydy/pydy/pull/514
+.. _#515: https://github.com/pydy/pydy/pull/515
+
+0.7.1 (March 4, 2023)
+=====================
+
+- Reduced sdist size by moving the MANIFEST.in prune command last.
+
+0.7.0 (March 4, 2023)
+=====================
+
+- Support Python 3.10 and 3.11. [PR `#488`_]
+- Fixed the Carvallo-Whipple bicycle model to match Basu-Mandal benchmark
+  numbers. [PR `#486`_]
+- Added Box geometry to the javascript GUI [PR `#484`_]
+- Updated the three link conical pendulum example to use new kanes_equations()
+  syntax. [PR `#481`_]
+- Added example of a 3D multilink pendulum with colliding bobs. [PR `#467`_]
+- ``LambdifyODEFunctionGenerator`` now accepts a ``cse=True/False`` kwarg and
+  if SymPy >=1.9 is installed, then the underlying generated code by
+  ``lambdify`` will be simplified. It is ``True`` by default. [PR `#464`_]
+- Visualization supports durations that don't start at 0.
+
+.. _#464: https://github.com/pydy/pydy/pull/464
+.. _#467: https://github.com/pydy/pydy/pull/467
+.. _#481: https://github.com/pydy/pydy/pull/481
+.. _#484: https://github.com/pydy/pydy/pull/484
+.. _#486: https://github.com/pydy/pydy/pull/486
+.. _#488: https://github.com/pydy/pydy/pull/488
+
+0.6.0 (February 4, 2022)
+========================
+
+- Dropped support for Python 2.7 and 3.6. [PR `#459`_]
+- Moved chaos pendulum example to Sphinx docs.
+- Added Astrobee example [PR `#453`_]
 - Added the ability to pass optional arguments to the ODE solver in System. [PR
   `#447`_]
 - Cylinders, Spheres, and Circles loaded via PyThreeJS will appear more round.
@@ -27,10 +115,13 @@ Release Notes
   [PR `#415`_]
 - Recommend installing from Conda Forge [PR `#411`_]
 
+.. _#459: https://github.com/pydy/pydy/pull/459
+.. _#453: https://github.com/pydy/pydy/pull/453
 .. _#447: https://github.com/pydy/pydy/pull/447
 .. _#442: https://github.com/pydy/pydy/pull/442
 .. _#440: https://github.com/pydy/pydy/pull/440
 .. _#432: https://github.com/pydy/pydy/pull/432
+.. _#429: https://github.com/pydy/pydy/pull/429
 .. _#424: https://github.com/pydy/pydy/pull/424
 .. _#423: https://github.com/pydy/pydy/pull/423
 .. _#421: https://github.com/pydy/pydy/pull/421
