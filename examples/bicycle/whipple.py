@@ -420,6 +420,7 @@ kane = mec.KanesMethod(
     configuration_constraints=symbolics['holonomic constraints'],
     u_dependent=symbolics['dependent generalized speeds'],
     velocity_constraints=symbolics['nonholonomic constraints']
+    constraint_solver='CRAMER',  # avoids divide-by-zero
 )
 
 kane.kanes_equations(symbolics['bodies'], loads=symbolics['loads'])
