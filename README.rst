@@ -34,14 +34,12 @@ can provide the user with their desired workflow, including:
 
 We started by building the SymPy_ `mechanics package`_ which provides an API
 for building models and generating the symbolic equations of motion for complex
-multibody systems. More recently we developed two packages, `pydy.codegen` and
-`pydy.viz`, for simulation and visualization of the models, respectively.  This
-Python package contains these two packages and other tools for working with
-mathematical models generated from SymPy mechanics. The remaining tools
-currently used in the PyDy workflow are popular scientific Python packages such
-as NumPy_, SciPy_, IPython_, Jupyter_, ipywidgets_, pythreejs_, and matplotlib_
-which provide additional code for numerical analyses, simulation, and
-visualization.
+multibody systems. This Python package contains tools for working with
+mathematical models generated from SymPy mechanics and establishes the bridge
+between these symbolic models and efficient numeric versions of the models. We
+leverage popular scientific Python packages such as NumPy_, SciPy_, IPython_,
+Jupyter_, ipywidgets_, pythreejs_, and matplotlib_ which provide additional
+code for numerical analyses, simulation, and visualization.
 
 .. _SymPy: http://sympy.org
 .. _mechanics package: http://docs.sympy.org/latest/modules/physics/mechanics/index.html
@@ -56,14 +54,15 @@ visualization.
 Installation
 ============
 
-We recommend the conda_ package manager and the Anaconda_ or Miniconda_
-distributions for easy cross platform installation.
+We recommend the conda_ package manager and the Anaconda_, Miniconda_, or
+Miniforge_ distributions for easy cross platform installation.
 
 .. _conda: http://conda.pydata.org/
 .. _Anaconda: http://docs.continuum.io/anaconda/
 .. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
+.. _Miniforge: https://conda-forge.org/miniforge/
 
-Once Anaconda (or Miniconda) is installed type::
+Once conda is installed type::
 
    $ conda install -c conda-forge pydy
 
@@ -94,14 +93,11 @@ package can be downloaded from PyPi\ [#]_::
 
 .. [#] Change ``X.X.X`` to the latest version number.
 
-and extracted and installed\ [#]_::
+and extracted and installed::
 
    $ tar -zxvf pydy-X.X.X.tar.gz
    $ cd pydy-X.X.X
    $ python -m pip install .
-
-.. [#] For system wide installs you may need root permissions (perhaps prepend
-   commands with ``sudo``).
 
 Dependencies
 ------------
