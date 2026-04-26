@@ -365,11 +365,10 @@ publications or on the web. This citation can be used:
    <http://dx.doi.org/10.1115/DETC2013-13470>`_.
 
 
-.. raw:: html
+PyDy is built by (made with `contrib.rocks <https://contrib.rocks>`_ :
 
-   <p>PyDy is built by (made with <a
-   href="https://contrib.rocks">contrib.rocks</a> :</p>
-   <a href="https://github.com/pydy/pydy/graphs/contributors"><img src="https://contrib.rocks/image?repo=pydy/pydy"></a>
+.. image:: https://contrib.rocks/image?repo=pydy/pydy
+   :target: https://github.com/pydy/pydy/graphs/contributors
 
 Questions, Bugs, Feature Requests
 =================================
