@@ -2,7 +2,7 @@
 Release Notes
 =============
 
-0.9.1 (April 26, 2026)
+0.9.2 (April 26, 2026)
 ======================
 
 - Added ``System.evaluate_ode()`` which evaluates the system's differential
