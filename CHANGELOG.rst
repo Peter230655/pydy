@@ -2,6 +2,12 @@
 Release Notes
 =============
 
+0.9.4 (April 26, 2026)
+======================
+
+- Remove contribrocks from the README, it is to difficult to satisfy both PyPi
+  and Sphinx (latex).
+
 0.9.3 (April 26, 2026)
 ======================
 

@@ -78,7 +78,6 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     'sphinx.ext.ifconfig',
-    'sphinx.ext.imgconverter',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
     'numpydoc',
