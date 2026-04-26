@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - cython
+  - imagemagick
   - jupyter_sphinx
   - matplotlib-base
   - numpy
