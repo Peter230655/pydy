@@ -2,6 +2,11 @@
 Release Notes
 =============
 
+0.9.3 (April 26, 2026)
+======================
+
+- Fixed issue with Sphinx LaTeX build (skip svg files).
+
 0.9.2 (April 26, 2026)
 ======================
 
