@@ -12,8 +12,10 @@
 Objectives
 ----------
 
-- Show how to use ``generate_ode_function``
 - Show how to use ``PyDy Visualization`` to generate a 3D animation.
+- Show how to calculate the reaction forces with ``System`` if the
+  reaction forces do not appear in the force vector.
+- Show how to use a specific ODE_solver.
 
 
 Description
@@ -39,9 +41,9 @@ A particle with mass :math:`m_1` is attached to each ball.
     import time
     import numpy as np
     import matplotlib.pyplot as plt
-    from scipy.integrate import solve_ivp, odeint
+    from scipy.integrate import solve_ivp
     from scipy.optimize import root
-    from pydy.codegen.ode_function_generators import generate_ode_function
+    from pydy.system import System
     from pydy.viz.shapes import Cylinder, Sphere
     from pydy.viz.scene import Scene
     from pydy.viz.visualization_frame import VisualizationFrame
@@ -161,6 +163,10 @@ Make the list of the bodies.
 
 .. jupyter-execute::
 
+    iXX = 2.0 / 5.0 * m * r**2
+    iYY = iXX
+    iZZ = iXX
+
     balls = []
     points = []
     links = []
@@ -239,28 +245,13 @@ Kanes's Equations
 
 The reaction forces (of course) contain accelerations.
 They are replaced by ``rhs`` as place holders and will be calculated
-numerically below. Symbolic calculation would be possible to too
+numerically below. Symbolic calculation would be possible too, but
 time consuming.
 
 .. jupyter-execute::
 
     react_forces = me.msubs(react_forces, {u[i].diff(t): rhs_subs[i]
                                            for i in range(len(u))})
-
-
-``generate_ode_function`` needs the mass matrix and the force.
-
-.. jupyter-execute::
-
-    MM = KM.mass_matrix
-    print('MM DS', me.find_dynamicsymbols(MM))
-    print('MM free symbols', MM.free_symbols)
-    print(f'MM contains {sm.count_ops(MM):,} operations', '\n')
-
-    force = KM.forcing
-    print('force DS', me.find_dynamicsymbols(force))
-    print('force free symbols', force.free_symbols)
-    print(f'force contains {sm.count_ops(force):,} operations', '\n')
 
 
 Energy, Momentum
@@ -295,38 +286,72 @@ Energy, Momentum
     ang_momentum = [ang_moment_x, ang_moment_y, ang_moment_z]
 
 
-Compilation
------------
+Create a specific ODE solver.
 
 .. jupyter-execute::
 
-    qL = q1 + u1
-    pL = [m, m1, m_link, g, r, l, iXX, iYY, iZZ, reibung, k]
+    def ode_solver(func, y0, times, args=(), **kwargs):
+        res = solve_ivp(lambda t, y, *args: func(y, t, *args),
+                       (times[0], times[-1]),
+                        y0,
+                        args=args,
+                        t_eval=times,
+                        method='Radau',
+                        atol=1.e-8,
+                        rtol=1.e-8,
+                        **kwargs)
+        return res.y.T
 
-    specified = None
-    constants = np.array(pL)
 
-Create the right hand side for the numerical integration.
+Initialize an instance of System. If an ODE solver is specified, it must
+be passed to the System at initialization.
 
 .. jupyter-execute::
 
-    kd_dict = KM.kindiffdict()
+    sys = System(KM, ode_solver=ode_solver)
 
-    rhs_gen = generate_ode_function(
-        force,
-        KM.q,
-        KM.u,
-        constants=constants,
-        mass_matrix=MM,
-        specifieds=specified,
-        coordinate_derivatives=sm.Matrix([kd_dict[i] for i in kd_dict.keys()]),
-        generator='cython',
-        linear_sys_solver='numpy',
-        constants_arg_type='array',
-        specifieds_arg_type='array',
-        time_first='True',
-        force_c_contiguous=True,
-    )
+
+Define the constants of the system.
+
+.. jupyter-execute::
+
+    sys.constants = {
+    g: 9.8,                       # gravitational acceleration
+    r: 1.5,                       # radius of the ball
+    m: 1.0,                       # mass of the ball
+    m1: 1.0 / 5.0,                # mass of the red dot
+    m_link: 0.5,                  # mass of the link
+    l: 6.0,                       # length of the massless rod of the pendulum
+    k: 1000.0,                    # 'spring constant' of the balls
+    reibung: 0.0,                 # friction in the joints
+    }
+
+Set the initial conditions.
+
+.. jupyter-execute::
+
+    sys.initial_conditions = {
+    q[0]: 0.0,
+    q[1]: 1.0,
+    q[2]: 0.2,  # initial deflection of the first rod
+
+    u[0]: 0.0,
+    u[1]: 0.0,
+    u[2]: 0.0  # initial ang. velocity of the first rod
+    }
+
+    q_keys = [q[i] for i in range(3, 3*n)]
+    q_rest_dict = dict.fromkeys(q_keys, 1.0)
+
+    u_keys = [u[i] for i in range(3, 3*n)]
+    u_rest_dict = dict.fromkeys(u_keys, 0.0)
+    for i in range(n-1):
+        u_rest_dict[q[3*i + 4]] = sys.initial_conditions[q[1]] * (-1)**(i+1)
+
+    sys.initial_conditions = sys.initial_conditions | q_rest_dict | u_rest_dict
+
+
+
 
 Below lambdify is used as speed is of no concern.
 
@@ -334,12 +359,14 @@ Dmc_loc, punkt_loc are needed for the animation only.
 
 .. jupyter-execute::
 
+    qL = q1 + u1
+    pL = [m, m1, m_link, g, r, l, reibung, k]
+
     punkt_loc = []
     Dmc_loc = []
     for i in range(n):
         punkt_loc.append([me.dot(punkt[i].pos_from(P[0]), uv) for uv in N])
         Dmc_loc.append([me.dot(Dmc[i].pos_from(P[0]), uv) for uv in N])
-
 
     pot_lam = sm.lambdify(qL + pL, pot_energie, cse=True)
     kin_lam = sm.lambdify(qL + pL, kin_energie, cse=True)
@@ -351,6 +378,9 @@ Dmc_loc, punkt_loc are needed for the animation only.
                                   react_forces, cse=True)
     ang_momentum_lam = sm.lambdify(qL + pL, ang_momentum, cse=True)
 
+    # For later use.
+    pL_vals = [sys.constants[p] for p in pL]
+
 
 
 Numerical Integration
@@ -358,51 +388,14 @@ Numerical Integration
 
 .. jupyter-execute::
 
-    # Input values
+    sys.generate_ode_function(generator='cython', linear_sys_solver='numpy')
 
-    r1 = 1.5                       # radius of the ball
-    m1 = 1.0                       # mass of the ball
-    m11 = m1 / 5.                  # mass of the red dot
-    m_link1 = 0.5 * m1             # mass of the link
-    l1 = 6.0                       # length of the massless rod of the pendulum
-    k1 = 1000.                     # 'spring constant' of the balls
-    reibung1 = 0.0                 # friction in the joints
-    q1x, q1y, q1z = 0.2, 0.2, 0.2  # initial deflection of the first rod
+    sys.times = np.linspace(0., 5.0, 500)
+    times = sys.times   # for later use
 
-    omega1 = 7.5                  # initial rot. speed of ball_i around A[i].y
-    u1x, u1y, u1z = 0.0, omega1, 0.0  # initial ang. velocity of the first rod
-    intervall = 5.0
+    resultat = sys.integrate()
 
-    schritte = 100 * int(intervall)
-    times = np.linspace(0., intervall, schritte)
-    iXX1 = 2./5. * m1 * r1**2
-    iYY1 = iXX1
-    iZZ1 = iXX1
-
-    pL_vals = np.array([m1, m11, m_link1, 9.8, r1, l1, iXX1, iYY1, iZZ1,
-                       reibung1, k1])
-
-    y0 = [q1x, q1y, q1z] + [0.0, 0.0, 0.0] * (n-1) + [u1x, u1y,
-        u1z] + [0.0, u1y, 0.0] * (n-1)
-
-    t_span = (0.0, intervall)
-
-Numerical integration.
-
-.. jupyter-execute::
-
-    resultat1 = solve_ivp(rhs_gen, t_span, y0, t_eval=times, args=(pL_vals,),
-                          method='Radau',
-                          atol=1e-6,
-                          rtol=1e-6,
-                          )
-
-    resultat = resultat1.y.T
-
-    print(resultat1.message)
-    print('Shape of resultat', resultat.shape)
-    print(f"To numerically integrate an intervall of {intervall:.3f} sec "
-          f"the routine cycled {resultat1.nfev:,} times")
+    print('resultat shape', resultat.shape)
 
 
 Calculate the Reaction Forces at the Suspension Point
@@ -413,9 +406,14 @@ The accelerations needed are calculated numerically and stored in ``RHS``
 
 .. jupyter-execute::
 
+    rhs_gen = sys.evaluate_ode
+
     RHS = np.empty((resultat.shape))
     for i in range(resultat.shape[0]):
-        RHS[i] = rhs_gen(0.0, resultat[i], pL_vals)
+        for j, key in enumerate(sys.initial_conditions.keys()):
+            sys.initial_conditions[key] = resultat[i, j]
+        RHS[i] = rhs_gen()
+
 
     react_x = np.empty(resultat.shape[0])
     react_y = np.empty(resultat.shape[0])
@@ -460,13 +458,12 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
                                   *pL_vals)
         total_np[i] = pot_np[i] + kin_np[i] + spring_np[i]
 
-    if reibung1 == 0.:
+    if sys.constants[reibung] == 0.:
         total_max = np.max(total_np)
         total_min = np.min(total_np)
         print('deviation of total energy from constant is {:.5f} % of max. '
               'total energy'.format((total_max - total_min)/total_max*100))
 
-    times = np.linspace(0., intervall, resultat.shape[0])
     fig, ax = plt.subplots(4, 1, figsize=(8, 10), layout='constrained',
                            sharex=True)
     ax[0].plot(times, pot_np, label='gravitational potential energy')
@@ -474,7 +471,8 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
     ax[0].plot(times, spring_np, label='spring potential energy')
     ax[0].plot(times, total_np, label='total energy')
     msg = r'$\mu$'
-    ax[0].set_title(f"Energies of the system, {msg} = {reibung1}")
+    ax[0].set_title(f"Energies of the system, {msg} "
+                    f"= {sys.constants[reibung]}")
     _ = ax[0].legend()
 
     for i in range(n, 2*n):
@@ -499,8 +497,10 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
                                       for j in range(resultat.shape[1])],
                                 *pL_vals)[1])
     error = (max_y - min_y) / max_y * 100.
-    print('deviation of Y - component of ang. momentum from being constant is '
-          '{:.5f} % of max. angular momentum'.format(error))
+    if abs(max_y) > 1.e-3:
+        print('deviation of Y - component of ang. momentum from being '
+              'constant is '
+              f'{error:.5f} % of max. angular momentum')
     ax[3].plot(
         times, ang_momentum_lam(
             *[resultat[:, j] for j in range(resultat.shape[1])],
