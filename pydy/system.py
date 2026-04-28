@@ -554,12 +554,12 @@ class System(object):
         ==========
         x : array_like, shape(n,) or shape(m, n)
             State values at time t.
-        t : float
-            Time.
+        t : float or shape(m,)
+            Time or m time values.
 
         Returns
         =======
-        x_dot : ndarray
+        x_dot : ndarray, shape(n,) or shape(m, n)
            Time derivative of the states at time t.
 
         Notes
@@ -570,24 +570,30 @@ class System(object):
             help(system.evaluate_ode_function)
 
         """
-        rhs = self.evaluate_ode_function
-
         x_default, args = self._prep_for_evaluate()
-        t_default = self.times[0]
-
-        if t is None:
-            t = t_default
 
         if x is None:
             x = x_default
-        else:
-            if len(x.shape) == 2:
-                assert x.shape[0] == len(t)
-                # do not vectorize r and p
-                excluded = {2} if len(args) == 1 else {2, 3}
-                rhs = np.vectorize(rhs, excluded=excluded)
+        x = np.asarray(x)
 
-        return rhs(np.asarray(x), t, *args)
+        if t is None:
+            t = self.times[0]
+
+        if len(x.shape) == 1 and not isinstance(t, float):
+            raise ValueError('Time must be a float.')
+        elif len(x.shape) == 1:
+            return self.evaluate_ode_function(x, t, *args)
+
+        # NOTE : I tried to make use of numpy.vectorize but it is not possible
+        # due to args not being necessarily being comprised of arrays.
+        if len(x.shape) == 2:
+            if x.shape[0] != len(t):
+                raise ValueError('x trajectory must have same length as t.')
+            xdot = np.zeros_like(x)
+            for i, (ti, xi) in enumerate(zip(t, x)):
+                xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)
+            return xdot
+
 
     def integrate(self, **solver_kwargs):
         """Integrates the equations ``evaluate_ode_function()`` using
@@ -615,6 +621,9 @@ class System(object):
 
         """
         x0, args = self._prep_for_evaluate()
+
+        # NOTE : User cannot pass in args, System handles that.
+        solver_kwargs.pop('args', None)
 
         x_history = self.ode_solver(
             self.evaluate_ode_function,
