@@ -385,6 +385,24 @@ class TestSystem():
         x_expected = np.array([-4.5, 10.58])
         np.testing.assert_allclose(x, x_expected)
 
+        xdot = self.sys.evaluate_ode(x=[1.0, 2.0])
+        assert xdot.shape == (2,)
+        xdot = self.sys.evaluate_ode(x=[1.0, 2.0], t=3.0)
+        assert xdot.shape == (2,)
+        xdot = self.sys.evaluate_ode(x=[[0.2, 1.0], [0.2, 3.0], [0.2, 0.3]],
+                                     t=[3.0, 5.0, 6.0])
+        assert xdot.shape == (3, 2)
+        with pytest.raises(ValueError):
+            xdot = self.sys.evaluate_ode(x=[1.0, 2.0, 3.0])
+        with pytest.raises(ValueError):
+            xdot = self.sys.evaluate_ode(x=[1.0, 2.0], t=[1.0, 2.0])
+        with pytest.raises(ValueError):
+            xdot = self.sys.evaluate_ode(x=[[0.2, 1.0],
+                                            [0.2, 3.0],
+                                            [0.2, 0.3]],
+                                         t=[3.0, 5.0])
+
+
     def test_integrate(self):
 
         times = np.linspace(0, 1, 100)
