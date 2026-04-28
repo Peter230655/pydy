@@ -545,7 +545,7 @@ class System(object):
 
         return initial_conditions_in_proper_order, args
 
-    def evaluate_ode(self, x=None, t=None, r=None, p=None):
+    def evaluate_ode(self, x=None, t=None):
         """Returns the right hand side of the differential equations. The
         default is to evaluate at the set initial_conditions at the first time
         value. Pass in optional arguments to override this.
@@ -583,19 +583,9 @@ class System(object):
         else:
             if len(x.shape) == 2:
                 assert x.shape[0] == len(t)
-                rhs = np.vectorize(rhs)
-
-        if r is not None:
-            if len(args) == 1:
-                raise ValueError("There are no specifieds.")
-            else:
-                args = (r, args[1])
-
-        if p is not None:
-            if len(args) == 1:
-                args = (p,)
-            else:
-                args = (args[0], p)
+                # do not vectorize r and p
+                excluded = {2} if len(args) == 1 else {2, 3}
+                rhs = np.vectorize(rhs, excluded=excluded)
 
         return rhs(np.asarray(x), t, *args)
 
