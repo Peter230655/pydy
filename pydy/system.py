@@ -545,9 +545,17 @@ class System(object):
 
         return initial_conditions_in_proper_order, args
 
-    def evaluate_ode(self):
-        """Returns the right hand side of the differential equations evaluated
-        at the set initial_conditions at the first time value.
+    def evaluate_ode(self, x=None, t=None, r=None, p=None):
+        """Returns the right hand side of the differential equations. The
+        default is to evaluate at the set initial_conditions at the first time
+        value. Pass in optional arguments to override this.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n)
+            State values at time t.
+        t : float
+            Time.
 
         Returns
         =======
@@ -562,9 +570,34 @@ class System(object):
             help(system.evaluate_ode_function)
 
         """
-        x0, args = self._prep_for_evaluate()
-        t0 = self.times[0]
-        return self.evaluate_ode_function(np.asarray(x0), t0, *args)
+        rhs = self.evaluate_ode_function
+
+        x_default, args = self._prep_for_evaluate()
+        t_default = self.times[0]
+
+        if t is None:
+            t = t_default
+
+        if x is None:
+            x = x_default
+        else:
+            if len(x.shape) == 2:
+                assert x.shape[0] == len(t)
+                rhs = np.vectorize(rhs)
+
+        if r is not None:
+            if len(args) == 1:
+                raise ValueError("There are no specifieds.")
+            else:
+                args = (r, args[1])
+
+        if p is not None:
+            if len(args) == 1:
+                args = (p,)
+            else:
+                args = (args[0], p)
+
+        return rhs(np.asarray(x), t, *args)
 
     def integrate(self, **solver_kwargs):
         """Integrates the equations ``evaluate_ode_function()`` using
