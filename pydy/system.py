@@ -456,6 +456,56 @@ class System(object):
 
         return kwargs
 
+    def _generate_constraint_functions(self):
+
+        all_constraints = []
+
+        if self.eom_method._f_h:
+            self._eval_holonomic = sm.lambdify(
+                (self.states, self.constants_symbols),
+                self.eom_method._f_h, cse=True)
+            all_constraints += self.eom_method._f_h[:]
+
+        if self.eom_method._k_nh:
+            # TODO : This includes the time derivative of the holonomic
+            # constraint and there is no way to know which order they were
+            # passed in to KanesMethod.
+            nh = self.eom_method._k_nh*self.eom_method.u + self.eom_method._f_nh
+            self._eval_nonholonomic = sm.lambdify(
+                (self.states, self.constants_symbols),
+                nh, cse=True)
+            all_constraints += nh[:]
+
+        if all_constraints:
+            all_constraints = sm.Matrix(all_constraints)
+            self._eval_constraints = sm.lambdify(
+                (self.states, self.constants_symbols),
+                all_constraints, cse=True)
+
+    def evaluate_holonomic(self, x=None):
+        if not hasattr(self, '_eval_holonomic'):
+            self._generate_constraint_functions()
+        if x is None:
+            x = np.array([self.initial_conditions[xi] for xi in self.states])
+        p = np.array([self.constants[pi] for pi in self.constants_symbols])
+        return self._eval_holonomic(x, p).squeeze()
+
+    def evaluate_nonholonomic(self, x=None):
+        if not hasattr(self, '_eval_nonholonomic'):
+            self._generate_constraint_functions()
+        if x is None:
+            x = np.array([self.initial_conditions[xi] for xi in self.states])
+        p = np.array([self.constants[pi] for pi in self.constants_symbols])
+        return self._eval_nonholonomic(x, p).squeeze()
+
+    def evaluate_constraints(self, x=None):
+        if not hasattr(self, '_eval_constraints'):
+            self._generate_constraint_functions()
+        if x is None:
+            x = np.array([self.initial_conditions[xi] for xi in self.states])
+        p = np.array([self.constants[pi] for pi in self.constants_symbols])
+        return self._eval_constraints(x, p).squeeze()
+
     def generate_ode_function(self, **kwargs):
         """Calls ``pydy.codegen.ode_function_generators.generate_ode_function``
         with the appropriate arguments, and sets the ``evaluate_ode_function``
@@ -554,7 +604,7 @@ class System(object):
         ==========
         x : array_like, shape(n,) or shape(m, n)
             State values at time t.
-        t : float or shape(m,)
+        t : float or array_like, shape(m,)
             Time or m time values.
 
         Returns
@@ -577,11 +627,14 @@ class System(object):
         x = np.asarray(x)
 
         if t is None:
-            t = self.times[0]
+            if len(x.shape) == 1:
+                t = self.times[0]
+            else:
+                t = self.times
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
-        elif len(x.shape) == 1:
+        elif len(x.shape) == 1 and isinstance(t, float):
             return self.evaluate_ode_function(x, t, *args)
 
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
