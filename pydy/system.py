@@ -544,6 +544,25 @@ class System(object):
         else:
             return self._eval_nonholonomic(x, p).squeeze()
 
+    def set_dependent_initial_conditions(self, dep_vars):
+        # TODO : Support dependent speeds also.
+        # TODO : The dependent variables are stored on KanesMethod.
+
+        dep_q = [vi for vi in dep_vars if vi in self.coordinates]
+
+        x = np.array([self.initial_conditions[xi] for xi in self.states])
+        q_dep_guess = [self.initial_conditions[xi] for xi in dep_q]
+        q_dep_idxs = [self.states.index(xi) for xi in dep_q]
+
+        def eval_holonomic(q_dep):
+            x[q_dep_idxs] = q_dep
+            return self.evaluate_holonomic(x=x)
+
+        from scipy.optimize import fsolve
+
+        for si, vi in zip(dep_vars, fsolve(eval_holonomic, q_dep_guess)):
+            self.initial_conditions[si] = vi
+
     def evaluate_constraints(self, x=None):
         """Returns the value of the given the system state.
 
