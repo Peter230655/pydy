@@ -457,6 +457,7 @@ class System(object):
         return kwargs
 
     def _generate_constraint_functions(self):
+        # TODO : Support explicit instance of time in the equations.
 
         all_constraints = []
 
@@ -467,9 +468,9 @@ class System(object):
             all_constraints += self.eom_method._f_h[:]
 
         if self.eom_method._k_nh:
-            # TODO : This includes the time derivative of the holonomic
-            # constraint and there is no way to know which order they were
-            # passed in to KanesMethod.
+            # rebuild the nonholonomic constraints
+            # TODO : KanesMethod and _Method should store the original
+            # constraints passed by the user. Fix in sympy.physics.mechanics.
             nh = self.eom_method._k_nh*self.eom_method.u + self.eom_method._f_nh
             self._eval_nonholonomic = sm.lambdify(
                 (self.states, self.constants_symbols),
@@ -483,28 +484,95 @@ class System(object):
                 all_constraints, cse=True)
 
     def evaluate_holonomic(self, x=None):
+        """Returns the value of the holonomic constraints given the system
+        state.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n)
+            State vector of array of state vectors.
+
+        Returns
+        =======
+        ndarray shape(o,) or shape(m, o)
+            Values of the o holonomic constraints.
+
+        """
+        if not self.eom_method._f_h:
+            raise ValueError('This system does not have holonomic constraints.')
         if not hasattr(self, '_eval_holonomic'):
             self._generate_constraint_functions()
         if x is None:
             x = np.array([self.initial_conditions[xi] for xi in self.states])
+        else:
+            x = np.asarray(x)
         p = np.array([self.constants[pi] for pi in self.constants_symbols])
-        return self._eval_holonomic(x, p).squeeze()
+        if len(x.shape) == 2:
+            x = x.T
+            return self._eval_holonomic(x, p).squeeze().T
+        else:
+            return self._eval_holonomic(x, p).squeeze()
 
     def evaluate_nonholonomic(self, x=None):
+        """Returns the value of the nonholonomic constraints given the system
+        state.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n)
+            State vector of array of state vectors.
+
+        Returns
+        =======
+        ndarray shape(o,) or shape(m, o)
+            Values of the o nonholonomic constraints.
+
+        """
+        if not self.eom_method._k_nh:
+            msg = 'This system does not have nonholonomic constraints.'
+            raise ValueError(msg)
         if not hasattr(self, '_eval_nonholonomic'):
             self._generate_constraint_functions()
         if x is None:
             x = np.array([self.initial_conditions[xi] for xi in self.states])
+        else:
+            x = np.asarray(x)
         p = np.array([self.constants[pi] for pi in self.constants_symbols])
-        return self._eval_nonholonomic(x, p).squeeze()
+        if len(x.shape) == 2:
+            x = x.T
+            return self._eval_nonholonomic(x, p).squeeze().T
+        else:
+            return self._eval_nonholonomic(x, p).squeeze()
 
     def evaluate_constraints(self, x=None):
+        """Returns the value of the given the system state.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n)
+            State vector of array of state vectors.
+
+        Returns
+        =======
+        ndarray shape(o,) or shape(m, o)
+            Values of the o constraints.
+
+        """
+        if not self.eom_method._f_h and not self.eom_method._k_nh:
+            msg = 'This system does not have constraints.'
+            raise ValueError(msg)
         if not hasattr(self, '_eval_constraints'):
             self._generate_constraint_functions()
         if x is None:
             x = np.array([self.initial_conditions[xi] for xi in self.states])
+        else:
+            x = np.asarray(x)
         p = np.array([self.constants[pi] for pi in self.constants_symbols])
-        return self._eval_constraints(x, p).squeeze()
+        if len(x.shape) == 2:
+            x = x.T
+            return self._eval_constraints(x, p).squeeze().T
+        else:
+            return self._eval_constraints(x, p).squeeze()
 
     def generate_ode_function(self, **kwargs):
         """Calls ``pydy.codegen.ode_function_generators.generate_ode_function``

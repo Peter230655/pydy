@@ -402,6 +402,13 @@ class TestSystem():
                                             [0.2, 0.3]],
                                          t=[3.0, 5.0])
 
+    def test_evaluate_constraints(self):
+        with pytest.raises(ValueError):
+            self.sys.evaluate_holonomic()
+        with pytest.raises(ValueError):
+            self.sys.evaluate_nonholonomic()
+        with pytest.raises(ValueError):
+            self.sys.evaluate_constraints()
 
     def test_integrate(self):
 
