@@ -57,6 +57,7 @@ import numpy as np
 import sympy as sm
 from sympy.physics.mechanics import dynamicsymbols, find_dynamicsymbols
 from scipy.integrate import odeint
+from scipy.optimize import fsolve
 
 from .codegen.ode_function_generators import generate_ode_function
 from .utils import PyDyFutureWarning
@@ -482,6 +483,7 @@ class System(object):
             self._eval_constraints = sm.lambdify(
                 (self.states, self.constants_symbols),
                 all_constraints, cse=True)
+            self._all_constraints = all_constraints
 
     def evaluate_holonomic(self, x=None):
         """Returns the value of the holonomic constraints given the system
@@ -544,23 +546,54 @@ class System(object):
         else:
             return self._eval_nonholonomic(x, p).squeeze()
 
-    def set_dependent_initial_conditions(self, dep_vars):
-        # TODO : Support dependent speeds also.
-        # TODO : The dependent variables are stored on KanesMethod.
+    def set_dependent_initial_conditions(self, use_jacobian=False, tol=1e-12):
+        """Sets the initial conditions of the dependent coordinates and
+        dependent speeds using the holonomic and nonholonomic constraints,
+        respectively.
 
-        dep_q = [vi for vi in dep_vars if vi in self.coordinates]
+        Parameters
+        ==========
+        use_jacobian : boolean, optional
+            If true the Jacobian of the constraint equations will be used to
+            solve the constraint equations for the dependent states.
+        tol : float
+            Tolerance for the solution to meet.
+
+        """
+        if not self.eom_method._f_h and not self.eom_method._k_nh:
+            msg = ('This system does not have constraints, set all initial '
+                   'conditions yourself.')
+            raise ValueError(msg)
+        # TODO : The nonholonomic constraints can be solved analytically,
+        # fsolve is only needed for the coordinates.
+        dep = self.eom_method._qdep[:] + self.eom_method._udep[:]
 
         x = np.array([self.initial_conditions[xi] for xi in self.states])
-        q_dep_guess = [self.initial_conditions[xi] for xi in dep_q]
-        q_dep_idxs = [self.states.index(xi) for xi in dep_q]
+        p = np.array([self.constants[pi] for pi in self.constants_symbols])
+        dep_guess = [self.initial_conditions[xi] for xi in dep]
+        dep_idxs = [self.states.index(xi) for xi in dep]
 
-        def eval_holonomic(q_dep):
-            x[q_dep_idxs] = q_dep
-            return self.evaluate_holonomic(x=x)
+        def eval_constraints(x_dep, p):
+            x[dep_idxs] = x_dep
+            return self.evaluate_constraints(x=x)
 
-        from scipy.optimize import fsolve
+        if use_jacobian:
+            jac = self._all_constraints.jacobian(dep)
+            eval_jac = sm.lambdify((self.states, self.constants_symbols), jac,
+                                   cse=True)
 
-        for si, vi in zip(dep_vars, fsolve(eval_holonomic, q_dep_guess)):
+            def eval_jacobian(x_dep, p):
+                x[dep_idxs] = x_dep
+                return eval_jac(x, p)
+
+            fprime = eval_jacobian
+        else:
+            fprime = None
+
+        dep_vals = fsolve(eval_constraints, dep_guess, args=(p,),
+                          fprime=fprime, xtol=tol)
+
+        for si, vi in zip(dep, dep_vals):
             self.initial_conditions[si] = vi
 
     def evaluate_constraints(self, x=None):

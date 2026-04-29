@@ -454,22 +454,6 @@ speeds and has an initial positive roll rate.
     initial_speed = 4.6  # m/s
     initial_roll_rate = 0.5  # rad/s
 
-The initial configuration will be the upright equilibrium position. The
-holonomic constraint requires that either the roll, pitch, or steer angle need
-be dependent. Below, the pitch angle is taken as dependent and solved for using
-`fsolve()`. Note that it is equivalent to the steer axis tilt in the nominal
-configuratio shown in [Meijaard2007]_.
-
-.. jupyter-execute::
-
-    def eval_holonomic(q5_val):
-        x = np.zeros(len(sys.states))
-        x[4] = np.atleast_1d(q5_val)[0]
-        return sys.evaluate_holonomic(x=x)
-
-    initial_pitch_angle = fsolve(eval_holonomic, np.pi/10.0)[0]
-    np.rad2deg(initial_pitch_angle)
-
 Set all of the initial conditions.
 
 .. jupyter-execute::
@@ -478,16 +462,19 @@ Set all of the initial conditions.
                               q2: 0.0,
                               q3: 0.0,
                               q4: 0.0,
-                              q5: initial_pitch_angle,
+                              q5: 0.0,
                               q7: 0.0,
-                              u1: initial_speed,
+                              u1: 0.0,
                               u2: 0.0,
                               u3: 0.0,
                               u4: initial_roll_rate,
                               u5: 0.0,
                               u6: -initial_speed/sys.constants[rr],
                               u7: 0.0,
-                              u8: -initial_speed/sys.constants[rf]}
+                              u8: 0.0}
+
+    sys.set_dependent_initial_conditions()
+    sys.initial_conditions
 
 Generate a time vector over which the integration will be carried out.
 
