@@ -462,15 +462,12 @@ configuratio shown in [Meijaard2007]_.
 
 .. jupyter-execute::
 
-    eval_holonomic = sm.lambdify((q5, q4, q7, d1, d2, d3, rf, rr), holonomic)
-    initial_pitch_angle = fsolve(eval_holonomic, 0.0,
-                                 args=(0.0,  # q4
-                                       0.0,  # q7
-                                       sys.constants[d1],
-                                       sys.constants[d2],
-                                       sys.constants[d3],
-                                       sys.constants[rf],
-                                       sys.constants[rr]))[0]
+    def eval_holonomic(q5_val):
+        x = np.zeros(len(sys.states))
+        x[4] = np.atleast_1d(q5_val)[0]
+        return sys.evaluate_holonomic(x=x)
+
+    initial_pitch_angle = fsolve(eval_holonomic, np.pi/10.0)[0]
     np.rad2deg(initial_pitch_angle)
 
 Set all of the initial conditions.
@@ -527,14 +524,7 @@ Evaluate the holonomic constraint across the simulation.
 
 .. jupyter-execute::
 
-   holonomic_vs_time  = eval_holonomic(x_trajectory[:, 5],  # q5
-                                       x_trajectory[:, 3],  # q4
-                                       x_trajectory[:, 4],  # q7
-                                       sys.constants[d1],
-                                       sys.constants[d2],
-                                       sys.constants[d3],
-                                       sys.constants[rf],
-                                       sys.constants[rr])
+   holonomic_vs_time = sys.eval_holonomic(x=x_trajectory)
 
 Plot the State Trajectories
 ===========================
