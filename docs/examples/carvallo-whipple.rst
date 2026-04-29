@@ -284,7 +284,7 @@ Linear Velocities
    co.v2pt_theory(do, N, C)
    ce.v2pt_theory(do, N, C)
    fo.v2pt_theory(ce, N, E)
-   eo.v2pt_theory(fo, N, E)
+   eo.v2pt_theory(fo, N, E);  # suppress output
 
 Motion Constraints
 ==================
