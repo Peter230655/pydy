@@ -524,7 +524,7 @@ Evaluate the holonomic constraint across the simulation.
 
 .. jupyter-execute::
 
-   holonomic_vs_time = sys.eval_holonomic(x=x_trajectory)
+   holonomic_vs_time = sys.evaluate_holonomic(x=x_trajectory)
 
 Plot the State Trajectories
 ===========================
