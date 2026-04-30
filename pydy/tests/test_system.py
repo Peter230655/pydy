@@ -580,19 +580,21 @@ def test_system_with_constraints(plot=False):
         N_w_C.dot(C.y) - u6,
     )
 
-    A.set_ang_vel(N, u4*N.z)
-    B.set_ang_vel(A, u5*A.x)
-    C.set_ang_vel(B, u6*B.y)
+    A.set_ang_vel(N, u4*N.z)  # yaw frame
+    B.set_ang_vel(A, u5*A.x)  # roll frame
+    C.set_ang_vel(B, u6*B.y)  # pitch frame (the disc)
 
-    P.set_pos(O, x*N.x + y*N.y + z*N.z)
-    Q.set_pos(P, r*B.z)
+    P.set_pos(O, x*N.x + y*N.y + z*N.z)  # bottom of disc
+    Q.set_pos(P, r*B.z)  # disc center
 
     O.set_vel(N, 0)
     P.set_vel(N, u1*N.x + u2*N.y + u3*N.z)
     Q.v2pt_theory(P, N, B)
 
+    # holonomic constraint to force bottom point to be in xy plane
     holonomic = (Q.pos_from(O).dot(N.z) - r*sm.cos(roll),)
 
+    # velocity of point fixed in disc at ground, should have velocity of zero
     v = Q.vel(N) + C.ang_vel_in(N).cross(-r*B.z)
     nonholonomic = (v.dot(A.x), v.dot(A.y), v.dot(N.z))
 
@@ -613,8 +615,9 @@ def test_system_with_constraints(plot=False):
         velocity_constraints=nonholonomic,
         bodies=(disc,),
         forcelist=(gravity,),
-        kd_eqs_solver='CRAMER',
-        constraint_solver='CRAMER',
+        # requires SymPy >= 1.13
+        #kd_eqs_solver='CRAMER',
+        #constraint_solver='CRAMER',
     )
     fr, frstar = kane.kanes_equations()
 
@@ -662,9 +665,47 @@ def test_system_with_constraints(plot=False):
     np.testing.assert_allclose(x0[u5], np.deg2rad(100.0))
     np.testing.assert_allclose(x0[u6], speed/sys.constants[r])
 
-    np.testing.assert_allclose(sys.evaluate_holonomic(), 0.0, atol=1e-10)
-    np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-10)
-    np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-10)
+    np.testing.assert_allclose(sys.evaluate_holonomic(), 0.0, atol=1e-12)
+    np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-12)
+    np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-12)
+
+    # nonholonomic function of: {u1(t), u2(t), u3(t), u4(t), u6(t)}
+    # u3 = 0
+    z_guess, u2_guess, u3_guess, u6_guess = 1.0, 1.0, 2.0, 2.0
+    sys.initial_conditions = {
+        x: 1.0,
+        y: -1.0,
+        z: z_guess,
+        yaw: yaw0,
+        roll: roll0,
+        pitch: 0.0,
+        u1: speed*np.cos(yaw0),
+        u2: u2_guess,  #speed*np.sin(yaw0),
+        u3: u3_guess,  # 0.0
+        u4: 0.0,
+        u5: np.deg2rad(100.0),
+        u6: u6_guess,  #speed/sys.constants[r],
+    }
+
+    sys.set_dependent_initial_conditions(dep=(z, u2, u3, u6),
+                                         use_jacobian=True)
+    x0 = sys.initial_conditions
+    np.testing.assert_allclose(x0[x], 1.0)
+    np.testing.assert_allclose(x0[y], -1.0)
+    np.testing.assert_allclose(x0[z], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[yaw], yaw0)
+    np.testing.assert_allclose(x0[roll], roll0)
+    np.testing.assert_allclose(x0[pitch], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[u1], speed*np.cos(yaw0))
+    np.testing.assert_allclose(x0[u2], speed*np.sin(yaw0))
+    np.testing.assert_allclose(x0[u3], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[u4], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[u5], np.deg2rad(100.0))
+    np.testing.assert_allclose(x0[u6], speed/sys.constants[r])
+
+    np.testing.assert_allclose(sys.evaluate_holonomic(), 0.0, atol=1e-12)
+    np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-12)
+    np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-12)
 
     fps = 30  # frames per second
     duration = 30.0  # seconds
@@ -672,10 +713,13 @@ def test_system_with_constraints(plot=False):
 
     trajectories = sys.integrate()
 
+    con_traj = sys.evaluate_constraints(x=trajectories)
+
     if plot:
         import matplotlib.pyplot as plt
 
-        fig, axes = plt.subplots(len(sys.states), 1, sharex=True, layout='constrained')
+        fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
+                                 layout='constrained')
         for ax, traj, s in zip(axes, trajectories.T, sys.states):
             ax.plot(sys.times, traj)
             ax.set_ylabel(s)
@@ -683,5 +727,10 @@ def test_system_with_constraints(plot=False):
         fig, ax = plt.subplots()
         ax.plot(trajectories[:, 0], trajectories[:, 1])
         ax.set_aspect('equal')
+
+        fig, axes = plt.subplots(con_traj.shape[1], 1, sharex=True,
+                                 layout='constrained')
+        for ax, traj in zip(axes, con_traj.T):
+            ax.plot(sys.times, traj)
 
         plt.show()
