@@ -520,6 +520,7 @@ Now integrate the equations of motion through time.
 .. jupyter-execute::
 
    x_trajectory = sys.integrate()
+   xdot_trajectory = sys.evaluate_ode(x=x_trajectory)
 
 Evaluate the holonomic constraint across the simulation.
 
@@ -527,21 +528,46 @@ Evaluate the holonomic constraint across the simulation.
 
    holonomic_vs_time = sys.evaluate_holonomic(x=x_trajectory)
 
+.. jupyter-execute::
+
+   constraints_trajectory = sys.evaluate_constraints(x=x_trajectory)
+
 Plot the State Trajectories
 ===========================
 
 .. jupyter-execute::
 
    import matplotlib.pyplot as plt
-   fig, axes = plt.subplots(len(sys.states) + 1, 1, sharex=True)
+   fig, axes = plt.subplots(len(sys.states) + 1, 1, sharex=True,
+                            layout='constrained')
    fig.set_size_inches(8, 16)
    for ax, traj, s in zip(axes, x_trajectory.T, sys.states):
        ax.plot(sys.times, traj)
-       ax.set_ylabel(s)
+       ax.set_ylabel(sm.latex(s, mode='inline'))
    axes[-1].plot(sys.times, np.squeeze(holonomic_vs_time))
    axes[-1].set_ylabel('Holonomic\nconstraint [m]')
-   axes[-1].set_xlabel('Time [s]')
-   plt.tight_layout()
+   axes[-1].set_xlabel('Time [s]');
+
+.. jupyter-execute::
+
+   import matplotlib.pyplot as plt
+   fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
+                            layout='constrained')
+   fig.set_size_inches(8, 16)
+   for ax, traj, s in zip(axes, xdot_trajectory.T, sys.states):
+       ax.plot(sys.times, traj)
+       ax.set_ylabel(sm.latex(s.diff(), mode='inline'))
+   axes[-1].set_xlabel('Time [s]');
+
+.. jupyter-execute::
+
+   import matplotlib.pyplot as plt
+   fig, axes = plt.subplots(constraints_trajectory.shape[1], 1, sharex=True,
+                            layout='constrained')
+   fig.set_size_inches(8, 6)
+   for ax, traj in zip(axes, constraints_trajectory.T):
+       ax.plot(sys.times, traj)
+   axes[-1].set_xlabel('Time [s]');
 
 Visualizing the System Motion
 =============================
