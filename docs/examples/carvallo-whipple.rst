@@ -453,8 +453,11 @@ speeds and has an initial positive roll rate.
 
     initial_speed = 4.6  # m/s
     initial_roll_rate = 0.5  # rad/s
+    pitch_guess = np.deg2rad(20.0)
+    wheel_speed_guess = -initial_speed/0.3
 
-Set all of the initial conditions.
+Set all of the initial conditions and provide guesses for dependent coordinates
+and speeds.
 
 .. jupyter-execute::
 
@@ -462,18 +465,23 @@ Set all of the initial conditions.
                               q2: 0.0,
                               q3: 0.0,
                               q4: 0.0,
-                              q5: 0.0,
+                              q5: pitch_guess,
                               q7: 0.0,
-                              u1: 0.0,
+                              u1: initial_speed,
                               u2: 0.0,
                               u3: 0.0,
                               u4: initial_roll_rate,
                               u5: 0.0,
-                              u6: -initial_speed/sys.constants[rr],
+                              u6: wheel_speed_guess,
                               u7: 0.0,
-                              u8: 0.0}
+                              u8: wheel_speed_guess}
 
-    sys.set_dependent_initial_conditions()
+Solve for the dependent states given the values of the independent states and
+guesses for the dependent states.
+
+.. jupyter-execute::
+
+    sys.set_dependent_initial_conditions(dep=(q5, u2, u3, u5, u6, u8))
     sys.initial_conditions
 
 Generate a time vector over which the integration will be carried out.

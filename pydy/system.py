@@ -57,7 +57,7 @@ import numpy as np
 import sympy as sm
 from sympy.physics.mechanics import dynamicsymbols, find_dynamicsymbols
 from scipy.integrate import odeint
-from scipy.optimize import fsolve
+from scipy.optimize import root
 
 from .codegen.ode_function_generators import generate_ode_function
 from .utils import PyDyFutureWarning
@@ -546,13 +546,20 @@ class System(object):
         else:
             return self._eval_nonholonomic(x, p).squeeze()
 
-    def set_dependent_initial_conditions(self, use_jacobian=False, tol=1e-12):
+    def set_dependent_initial_conditions(self, dep=None, use_jacobian=False,
+                                         tol=1e-12):
         """Sets the initial conditions of the dependent coordinates and
         dependent speeds using the holonomic and nonholonomic constraints,
         respectively.
 
         Parameters
         ==========
+        dep : iterable of Function()(t), optional
+            Dependent coordinates and speeds to solve for. The number of
+            coordinates should be equal to the number of holonomic constraints.
+            The number of speeds should be equal to the number of nonholonic
+            constraints. If None, the dependence coordinates and speeds are
+            those used in KanesMethod instantiation.
         use_jacobian : boolean, optional
             If true the Jacobian of the constraint equations will be used to
             solve the constraint equations for the dependent states.
@@ -560,38 +567,59 @@ class System(object):
             Tolerance for the solution to meet.
 
         """
+        # TODO : The nonholonomic constraints can be solved analytically, root
+        # is only required for the coordinates.
+
         if not self.eom_method._f_h and not self.eom_method._k_nh:
             msg = ('This system does not have constraints, set all initial '
                    'conditions yourself.')
             raise ValueError(msg)
-        # TODO : The nonholonomic constraints can be solved analytically,
-        # fsolve is only needed for the coordinates.
-        dep = self.eom_method._qdep[:] + self.eom_method._udep[:]
+        else:
+            num_holo = len(self.eom_method._f_h)
+            num_nonh = self.eom_method._k_nh.shape[0]
+
+        if dep is None:
+            dep = self.eom_method._qdep[:] + self.eom_method._udep[:]
+
+        # TODO : Would be nice to check if the dependent variables are present
+        # in the constraints and that the right number of coordinates and
+        # speeds are each supplied.
+        if len(dep) != num_holo + num_nonh:
+            msg = (f'You must supply {num_holo} dependent coordinates and '
+                   f'{num_nonh} dependent speeds.')
+            raise ValueError(msg)
 
         x = np.array([self.initial_conditions[xi] for xi in self.states])
         p = np.array([self.constants[pi] for pi in self.constants_symbols])
         dep_guess = [self.initial_conditions[xi] for xi in dep]
         dep_idxs = [self.states.index(xi) for xi in dep]
 
-        def eval_constraints(x_dep, p):
-            x[dep_idxs] = x_dep
-            return self.evaluate_constraints(x=x)
-
         if use_jacobian:
             jac = self._all_constraints.jacobian(dep)
             eval_jac = sm.lambdify((self.states, self.constants_symbols), jac,
                                    cse=True)
 
-            def eval_jacobian(x_dep, p):
+            def eval_f(x_dep, p):
                 x[dep_idxs] = x_dep
-                return eval_jac(x, p)
+                return self.evaluate_constraints(x=x), eval_jac(x, p)
 
-            fprime = eval_jacobian
+            fprime = True
         else:
-            fprime = None
 
-        dep_vals = fsolve(eval_constraints, dep_guess, args=(p,),
-                          fprime=fprime, xtol=tol)
+            def eval_f(x_dep, p):
+                x[dep_idxs] = x_dep
+                return self.evaluate_constraints(x=x)
+
+            fprime = False
+
+        sol = root(eval_f, dep_guess, args=(p,), jac=fprime, tol=tol)
+        if sol.success:
+            dep_vals = sol.x
+        else:
+            msg = ('Failed to find a solution. Maybe a better guess will help '
+                   'or  you may have to manually solve for the dependent '
+                   'coordinates.')
+            raise RuntimeError(msg)
 
         for si, vi in zip(dep, dep_vals):
             self.initial_conditions[si] = vi
