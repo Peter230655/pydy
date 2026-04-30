@@ -173,8 +173,8 @@ physical parameters.
    ie11, ie22, ie33, ie31 = sm.symbols('ie11 ie22 ie33 ie31')
    if11, if22 = sm.symbols('if11 if22')
 
-Specified
-=========
+Specifieds
+==========
 
 Declare three specified torques that are functions of time.
 
@@ -400,7 +400,7 @@ Provide the rigid bodies and all loads to generate Kane's equations:
 
    fr, frstar = kane.kanes_equations(bodies, loads)
 
-Simulating the system
+Simulating the System
 =====================
 
 PyDy's ``System`` is a wrapper that holds the ``KanesMethod`` object to
@@ -483,6 +483,12 @@ guesses for the dependent states.
 
     sys.set_dependent_initial_conditions(dep=(q5, u2, u3, u5, u6, u8))
     sys.initial_conditions
+
+Check if the initial conditions satisfy the constraints.
+
+.. jupyter-execute::
+
+   np.isclose(sys.evaluate_constraints(), 0.0)
 
 Generate a time vector over which the integration will be carried out.
 
