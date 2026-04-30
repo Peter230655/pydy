@@ -550,3 +550,138 @@ def test_specifying_coordinate_issue_339():
     sys.times = np.linspace(0, 10, 20)
 
     sys.integrate()
+
+def test_system_with_constraints(plot=False):
+    """Rolling disc. Start with disc suspended above a ground plane. Use a
+    holonomic constraint to keep it rolling on the ground plane. Add no-slip
+    rolling constraints for nonholonomic."""
+
+    r, g, m = sm.symbols('r, g, m', real=True)
+
+    x, y, z = me.dynamicsymbols('q1, q2, q3', real=True)
+    yaw, roll, pitch = me.dynamicsymbols('q4, q5, q6', real=True)
+    u1, u2, u3, u4, u5, u6 = me.dynamicsymbols('u1, u2, u3, u4, u5, u6',
+                                               real=True)
+
+    N, A, B, C = sm.symbols('N, A, B, C', cls=me.ReferenceFrame)
+    O, P, Q = sm.symbols('O, P, Q', cls=me.Point)
+
+    A.orient_axis(N, yaw, N.z)
+    B.orient_axis(A, roll, A.x)
+    C.orient_axis(B, pitch, B.y)
+    N_w_C = C.ang_vel_in(N)
+
+    kd_eqs=(
+        x.diff() - u1,
+        y.diff() - u2,
+        z.diff() - u3,
+        N_w_C.dot(C.z) - u4,
+        N_w_C.dot(C.x) - u5,
+        N_w_C.dot(C.y) - u6,
+    )
+
+    A.set_ang_vel(N, u4*N.z)
+    B.set_ang_vel(A, u5*A.x)
+    C.set_ang_vel(B, u6*B.y)
+
+    P.set_pos(O, x*N.x + y*N.y + z*N.z)
+    Q.set_pos(P, r*B.z)
+
+    O.set_vel(N, 0)
+    P.set_vel(N, u1*N.x + u2*N.y + u3*N.z)
+    Q.v2pt_theory(P, N, B)
+
+    holonomic = (Q.pos_from(O).dot(N.z) - r*sm.cos(roll),)
+
+    v = Q.vel(N) + C.ang_vel_in(N).cross(-r*B.z)
+    nonholonomic = (v.dot(A.x), v.dot(A.y), v.dot(N.z))
+
+    inertia = me.Inertia.from_inertia_scalars(
+        Q, C, m*r**2/4, m*r**2/2, m*r**2/4)
+    disc = me.RigidBody('disc', Q, C, m, inertia)
+
+    gravity = me.Force(Q, -m*g*N.z)
+
+    kane = me.KanesMethod(
+        N,
+        (x, y, yaw, roll, pitch),
+        (u4, u5, u6),
+        kd_eqs=kd_eqs,
+        q_dependent=(z,),
+        u_dependent=(u1, u2, u3),
+        configuration_constraints=holonomic,
+        velocity_constraints=nonholonomic,
+        bodies=(disc,),
+        forcelist=(gravity,),
+        kd_eqs_solver='CRAMER',
+        constraint_solver='CRAMER',
+    )
+    fr, frstar = kane.kanes_equations()
+
+    sys = System(kane)
+
+    sys.constants = {
+        r: 0.3,
+        g: 9.81,
+        m: 1.25,
+    }
+
+    speed = 10.0
+    yaw0 = np.deg2rad(10.0)
+    roll0 = np.deg2rad(10.0)
+
+    z_guess, u1_guess, u2_guess, u3_guess = 0.1, 5.0, 5.0, 1.0
+
+    sys.initial_conditions = {
+        x: 1.0,
+        y: -1.0,
+        z: z_guess,
+        yaw: yaw0,
+        roll: roll0,
+        pitch: 0.0,
+        u1: u1_guess,  #speed*np.cos(yaw0),
+        u2: u2_guess,  #speed*np.sin(yaw0),
+        u3: u3_guess,
+        u4: 0.0,
+        u5: np.deg2rad(100.0),
+        u6: speed/sys.constants[r],
+    }
+
+    sys.set_dependent_initial_conditions()
+    x0 = sys.initial_conditions
+    np.testing.assert_allclose(x0[x], 1.0)
+    np.testing.assert_allclose(x0[y], -1.0)
+    np.testing.assert_allclose(x0[z], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[yaw], yaw0)
+    np.testing.assert_allclose(x0[roll], roll0)
+    np.testing.assert_allclose(x0[pitch], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[u1], speed*np.cos(yaw0))
+    np.testing.assert_allclose(x0[u2], speed*np.sin(yaw0))
+    np.testing.assert_allclose(x0[u3], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[u4], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[u5], np.deg2rad(100.0))
+    np.testing.assert_allclose(x0[u6], speed/sys.constants[r])
+
+    np.testing.assert_allclose(sys.evaluate_holonomic(), 0.0, atol=1e-10)
+    np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-10)
+    np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-10)
+
+    fps = 30  # frames per second
+    duration = 30.0  # seconds
+    sys.times = np.linspace(0.0, duration, num=int(duration*fps))
+
+    trajectories = sys.integrate()
+
+    if plot:
+        import matplotlib.pyplot as plt
+
+        fig, axes = plt.subplots(len(sys.states), 1, sharex=True, layout='constrained')
+        for ax, traj, s in zip(axes, trajectories.T, sys.states):
+            ax.plot(sys.times, traj)
+            ax.set_ylabel(s)
+
+        fig, ax = plt.subplots()
+        ax.plot(trajectories[:, 0], trajectories[:, 1])
+        ax.set_aspect('equal')
+
+        plt.show()
