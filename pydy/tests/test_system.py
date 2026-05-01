@@ -598,11 +598,10 @@ def test_system_with_constraints(plot=False):
     v = Q.vel(N) + C.ang_vel_in(N).cross(-r*B.z)
     nonholonomic = (v.dot(A.x), v.dot(A.y), v.dot(N.z))
 
-    inertia = me.Inertia.from_inertia_scalars(
-        Q, C, m*r**2/4, m*r**2/2, m*r**2/4)
+    inertia = (Q, me.inertia(C, m*r**2/4, m*r**2/2, m*r**2/4))
     disc = me.RigidBody('disc', Q, C, m, inertia)
 
-    gravity = me.Force(Q, -m*g*N.z)
+    gravity = (Q, -m*g*N.z)
 
     kane = me.KanesMethod(
         N,
