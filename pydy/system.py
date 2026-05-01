@@ -126,9 +126,9 @@ class System(object):
             self.initial_conditions = initial_conditions
 
         if times is None:
-            self._times = []
+            self.times = []
         else:
-            self._times = times
+            self.times = times
 
         self._evaluate_ode_function = None
 
@@ -344,6 +344,7 @@ class System(object):
         self._check_times(self._times)
 
     def _check_times(self, times):
+
         if len(times.shape) == 0:
             raise TypeError("Times supplied should be in an array_like format.")
 
@@ -721,6 +722,9 @@ class System(object):
         self._check_specifieds(self.specifieds)
         self._check_initial_conditions(self.initial_conditions)
         self._check_times(self.times)
+
+        if len(self.times) < 2:
+            raise ValueError('The times vector must be at least length 2.')
 
         if self.evaluate_ode_function is None:
             self.generate_ode_function()
