@@ -57,7 +57,7 @@ class TestSystem():
         assert sys.specifieds == dict()
         assert sys.initial_conditions == dict()
         assert sys.constants == dict()
-        assert sys.times == list()
+        np.testing.assert_allclose(sys.times, np.array([]))
 
         # Specify a bunch of attributes during construction.
         # --------------------------------------------------
