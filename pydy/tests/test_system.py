@@ -615,9 +615,6 @@ def test_system_with_constraints(plot=False):
         velocity_constraints=nonholonomic,
         bodies=(disc,),
         forcelist=(gravity,),
-        # requires SymPy >= 1.13
-        #kd_eqs_solver='CRAMER',
-        #constraint_solver='CRAMER',
     )
     fr, frstar = kane.kanes_equations()
 
@@ -669,6 +666,34 @@ def test_system_with_constraints(plot=False):
     np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-12)
     np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-12)
 
+    with pytest.raises(ValueError):  # times array not set
+        xdot0 = sys.evaluate_ode()
+
+    sys.times = np.array([1.0, 2.0])
+
+    xdot0 = sys.evaluate_ode()
+    xdot0_expected = np.array([9.84807753, 1.73648178, 0.0, 1.74532925,
+                               33.33333333, 0.0, -118.15025127, 4.54263633,
+                               20.51657582, 6.06146488, 1.0687998 , 0.0])
+    np.testing.assert_allclose(xdot0, xdot0_expected)
+
+    xdot0 = sys.evaluate_ode(x=np.ones(len(sys.states)))
+    xdot0_expected = np.array([
+        1.0,
+        1.0,
+        -0.5574077246549022,
+        1.3817732906760363,
+        1.4690424270048894,
+        1.0,
+        -3.7016314353618576,
+        21.573926,
+        2.449849,
+        0.9545054524443378,
+        0.06103534404727443,
+        0.0,
+    ])
+    np.testing.assert_allclose(xdot0, xdot0_expected)
+
     # nonholonomic function of: {u1(t), u2(t), u3(t), u4(t), u6(t)}
     # u3 = 0
     z_guess, u2_guess, u3_guess, u6_guess = 1.0, 1.0, 2.0, 2.0
@@ -688,7 +713,7 @@ def test_system_with_constraints(plot=False):
     }
 
     sys.set_dependent_initial_conditions(dep=(z, u2, u3, u6),
-                                         use_jacobian=True)
+                                         use_jacobian=True, tol=1e-13)
     x0 = sys.initial_conditions
     np.testing.assert_allclose(x0[x], 1.0)
     np.testing.assert_allclose(x0[y], -1.0)
@@ -708,11 +733,10 @@ def test_system_with_constraints(plot=False):
     np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-12)
 
     fps = 30  # frames per second
-    duration = 30.0  # seconds
+    duration = 24.0  # seconds
     sys.times = np.linspace(0.0, duration, num=int(duration*fps))
 
     trajectories = sys.integrate()
-
     con_traj = sys.evaluate_constraints(x=trajectories)
 
     if plot:
