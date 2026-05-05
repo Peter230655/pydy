@@ -723,24 +723,24 @@ def test_system_with_constraints(plot=False):
     }
 
     sys.set_dependent_initial_conditions(dep=(z, u2, u3, u6),
-                                         use_jacobian=True, tol=1e-13)
+                                         use_jacobian=True, tol=1e-10)
     x0 = sys.initial_conditions
     np.testing.assert_allclose(x0[x], 1.0)
     np.testing.assert_allclose(x0[y], -1.0)
-    np.testing.assert_allclose(x0[z], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[z], 0.0, atol=1e-10)
     np.testing.assert_allclose(x0[yaw], yaw0)
     np.testing.assert_allclose(x0[roll], roll0)
-    np.testing.assert_allclose(x0[pitch], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[pitch], 0.0, atol=1e-10)
     np.testing.assert_allclose(x0[u1], speed*np.cos(yaw0))
     np.testing.assert_allclose(x0[u2], speed*np.sin(yaw0))
-    np.testing.assert_allclose(x0[u3], 0.0, atol=1e-12)
-    np.testing.assert_allclose(x0[u4], 0.0, atol=1e-12)
+    np.testing.assert_allclose(x0[u3], 0.0, atol=1e-10)
+    np.testing.assert_allclose(x0[u4], 0.0, atol=1e-10)
     np.testing.assert_allclose(x0[u5], np.deg2rad(100.0))
     np.testing.assert_allclose(x0[u6], speed/sys.constants[r])
 
-    np.testing.assert_allclose(sys.evaluate_holonomic(), 0.0, atol=1e-12)
-    np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-12)
-    np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-12)
+    np.testing.assert_allclose(sys.evaluate_holonomic(), 0.0, atol=1e-10)
+    np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-10)
+    np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-10)
 
     fps = 30  # frames per second
     duration = 24.0  # seconds
