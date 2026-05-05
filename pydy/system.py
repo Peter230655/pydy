@@ -547,6 +547,36 @@ class System(object):
         else:
             return self._eval_nonholonomic(x, p).squeeze()
 
+    def evaluate_constraints(self, x=None):
+        """Returns the value of the given the system state.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n)
+            State vector of array of state vectors.
+
+        Returns
+        =======
+        ndarray shape(o,) or shape(m, o)
+            Values of the o constraints.
+
+        """
+        if not self.eom_method._f_h and not self.eom_method._k_nh:
+            msg = 'This system does not have constraints.'
+            raise ValueError(msg)
+        if not hasattr(self, '_eval_constraints'):
+            self._generate_constraint_functions()
+        if x is None:
+            x = np.array([self.initial_conditions[xi] for xi in self.states])
+        else:
+            x = np.asarray(x)
+        p = np.array([self.constants[pi] for pi in self.constants_symbols])
+        if len(x.shape) == 2:
+            x = x.T
+            return self._eval_constraints(x, p).squeeze().T
+        else:
+            return self._eval_constraints(x, p).squeeze()
+
     def set_dependent_initial_conditions(self, dep=None, use_jacobian=False,
                                          tol=1e-12):
         """Sets the initial conditions of the dependent coordinates and
@@ -625,35 +655,6 @@ class System(object):
         for si, vi in zip(dep, dep_vals):
             self.initial_conditions[si] = vi
 
-    def evaluate_constraints(self, x=None):
-        """Returns the value of the given the system state.
-
-        Parameters
-        ==========
-        x : array_like, shape(n,) or shape(m, n)
-            State vector of array of state vectors.
-
-        Returns
-        =======
-        ndarray shape(o,) or shape(m, o)
-            Values of the o constraints.
-
-        """
-        if not self.eom_method._f_h and not self.eom_method._k_nh:
-            msg = 'This system does not have constraints.'
-            raise ValueError(msg)
-        if not hasattr(self, '_eval_constraints'):
-            self._generate_constraint_functions()
-        if x is None:
-            x = np.array([self.initial_conditions[xi] for xi in self.states])
-        else:
-            x = np.asarray(x)
-        p = np.array([self.constants[pi] for pi in self.constants_symbols])
-        if len(x.shape) == 2:
-            x = x.T
-            return self._eval_constraints(x, p).squeeze().T
-        else:
-            return self._eval_constraints(x, p).squeeze()
 
     def generate_ode_function(self, **kwargs):
         """Calls ``pydy.codegen.ode_function_generators.generate_ode_function``
