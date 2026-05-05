@@ -412,7 +412,7 @@ class System(object):
 
     @property
     def _initial_conditions_array(self):
-        x0_dict = self._initial_conditions_padded_with_defaults
+        x0_dict = self._initial_conditions_padded_with_defaults()
         return np.array([x0_dict[xi] for xi in self.states])
 
     @property
