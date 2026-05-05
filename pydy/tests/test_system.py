@@ -629,7 +629,7 @@ def test_system_with_constraints(plot=False):
     yaw0 = np.deg2rad(10.0)
     roll0 = np.deg2rad(10.0)
 
-    z_guess, u1_guess, u2_guess, u3_guess = 0.1, 5.0, 5.0, 1.0
+    z_guess, u1_guess, u2_guess, u3_guess = 0.1, 10.0, 1.0, 0.1
 
     sys.initial_conditions = {
         x: 1.0,
@@ -671,10 +671,21 @@ def test_system_with_constraints(plot=False):
     sys.times = np.array([1.0, 2.0])
 
     xdot0 = sys.evaluate_ode()
-    xdot0_expected = np.array([9.84807753, 1.73648178, 0.0, 1.74532925,
-                               33.33333333, 0.0, -118.15025127, 4.54263633,
-                               20.51657582, 6.06146488, 1.0687998 , 0.0])
-    np.testing.assert_allclose(xdot0, xdot0_expected)
+    xdot0_expected = np.array([
+        9.84807753,
+        1.7364817766693035,
+        0.0,
+        1.7453292519943295,
+        33.33333333,
+        0.0,
+        -118.15025127,
+        4.542636327766898,
+        20.51657582308824,
+        6.0614648807520375,
+        1.0687998010934021,
+        0.0,
+    ])
+    np.testing.assert_allclose(xdot0, xdot0_expected, rtol=1e-10, atol=1e-10)
 
     xdot0 = sys.evaluate_ode(x=np.ones(len(sys.states)))
     xdot0_expected = np.array([
@@ -685,17 +696,17 @@ def test_system_with_constraints(plot=False):
         1.4690424270048894,
         1.0,
         -3.7016314353618576,
-        21.573926,
-        2.449849,
+        21.57392570087562,
+        2.4498490534935637,
         0.9545054524443378,
         0.06103534404727443,
         0.0,
     ])
-    np.testing.assert_allclose(xdot0, xdot0_expected)
+    np.testing.assert_allclose(xdot0, xdot0_expected, rtol=1e-10, atol=1e-10)
 
     # nonholonomic function of: {u1(t), u2(t), u3(t), u4(t), u6(t)}
     # u3 = 0
-    z_guess, u2_guess, u3_guess, u6_guess = 1.0, 1.0, 2.0, 2.0
+    z_guess, u2_guess, u3_guess, u6_guess = 0.1, 10.0, 0.1, 30.0
     sys.initial_conditions = {
         x: 1.0,
         y: -1.0,
