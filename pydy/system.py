@@ -703,7 +703,7 @@ class System(object):
         else:
             msg = ('Failed to find a solution. Maybe a better guess will help '
                    'or you may have to manually solve for the dependent '
-                   'coordinates.')
+                   'coordinates.' + sol.message)
             raise RuntimeError(msg)
 
         for si, vi in zip(dep, dep_vals):
