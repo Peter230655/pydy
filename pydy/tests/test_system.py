@@ -706,7 +706,7 @@ def test_system_with_constraints(plot=False):
 
     # nonholonomic function of: {u1(t), u2(t), u3(t), u4(t), u6(t)}
     # u3 = 0
-    z_guess, u2_guess, u3_guess, u6_guess = 0.1, 10.0, 0.1, 30.0
+    z_guess, u2_guess, u3_guess, u6_guess = 0.0, 0.0, 0.0, 30.0
     sys.initial_conditions = {
         x: 1.0,
         y: -1.0,
