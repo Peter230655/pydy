@@ -674,7 +674,7 @@ class System(object):
                    f'{num_nonh} dependent speeds.')
             raise ValueError(msg)
 
-        x = self._initial_condition_array
+        x = self._initial_conditions_array
         p = self._constants_array
         dep_guess = [self.initial_conditions[xi] for xi in dep]
         dep_idxs = [self.states.index(xi) for xi in dep]
