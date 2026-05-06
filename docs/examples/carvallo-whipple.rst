@@ -23,9 +23,9 @@ Import the necessary libraries, classes, and functions:
 .. jupyter-execute::
 
    import numpy as np
-   from scipy.optimize import fsolve
    import sympy as sm
    import sympy.physics.mechanics as mec
+   import matplotlib.pyplot as plt
    from pydy.system import System
    from pydy.viz import Sphere, Cylinder, VisualizationFrame, Scene
 
@@ -522,50 +522,48 @@ Now integrate the equations of motion through time.
    x_trajectory = sys.integrate()
    xdot_trajectory = sys.evaluate_ode(x=x_trajectory)
 
-Evaluate the holonomic constraint across the simulation.
+Evaluate the constraints at each time value.
 
 .. jupyter-execute::
 
-   holonomic_vs_time = sys.evaluate_holonomic(x=x_trajectory)
+   con_trajectory = sys.evaluate_constraints(x=x_trajectory)
+
+Plot the Trajectories
+=====================
+
+State trajectories:
 
 .. jupyter-execute::
 
-   constraints_trajectory = sys.evaluate_constraints(x=x_trajectory)
-
-Plot the State Trajectories
-===========================
-
-.. jupyter-execute::
-
-   import matplotlib.pyplot as plt
-   fig, axes = plt.subplots(len(sys.states) + 1, 1, sharex=True,
+   fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
                             layout='constrained')
    fig.set_size_inches(8, 16)
    for ax, traj, s in zip(axes, x_trajectory.T, sys.states):
        ax.plot(sys.times, traj)
        ax.set_ylabel(sm.latex(s, mode='inline'))
-   axes[-1].plot(sys.times, np.squeeze(holonomic_vs_time))
-   axes[-1].set_ylabel('Holonomic\nconstraint [m]')
    axes[-1].set_xlabel('Time [s]');
+
+Acceleration trajectories:
 
 .. jupyter-execute::
 
-   import matplotlib.pyplot as plt
-   fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
+   fig, axes = plt.subplots(len(sys.speeds), 1, sharex=True,
                             layout='constrained')
-   fig.set_size_inches(8, 16)
-   for ax, traj, s in zip(axes, xdot_trajectory.T, sys.states):
+   fig.set_size_inches(8, 8)
+   for ax, traj, s in zip(axes, xdot_trajectory.T[6:], sys.speeds):
        ax.plot(sys.times, traj)
        ax.set_ylabel(sm.latex(s.diff(), mode='inline'))
    axes[-1].set_xlabel('Time [s]');
 
+Constraint trajectories:
+
 .. jupyter-execute::
 
-   import matplotlib.pyplot as plt
-   fig, axes = plt.subplots(constraints_trajectory.shape[1], 1, sharex=True,
+   fig, axes = plt.subplots(con_trajectory.shape[1], 1,
+                            sharex=True,
                             layout='constrained')
    fig.set_size_inches(8, 6)
-   for ax, traj in zip(axes, constraints_trajectory.T):
+   for ax, traj in zip(axes, con_trajectory.T):
        ax.plot(sys.times, traj)
    axes[-1].set_xlabel('Time [s]');
 
