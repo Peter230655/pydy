@@ -60,7 +60,7 @@ from scipy.integrate import odeint
 from scipy.optimize import root
 
 from .codegen.ode_function_generators import generate_ode_function
-from .utils import PyDyFutureWarning
+from .utils import PyDyFutureWarning, PyDyUserWarning
 
 SYMPY_VERSION = sm.__version__
 
@@ -706,7 +706,7 @@ class System(object):
             msg = ('Failed to find a solution. Maybe a better guess will help '
                    'or you may have to manually solve for the dependent '
                    'coordinates. SciPy root() failure message: ' + sol.message)
-            print(msg)
+            warnings.warn(msg, PyDyUserWarning, stacklevel=2)
 
         dep_vals = sol.x
 
