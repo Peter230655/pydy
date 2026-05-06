@@ -702,13 +702,13 @@ class System(object):
             fprime = False
 
         sol = root(eval_f, dep_guess, args=(p,), jac=fprime, tol=tol)
-        if sol.success:
-            dep_vals = sol.x
-        else:
+        if not sol.success:
             msg = ('Failed to find a solution. Maybe a better guess will help '
                    'or you may have to manually solve for the dependent '
-                   'coordinates.' + sol.message)
-            raise RuntimeError(msg)
+                   'coordinates. SciPy root() failure message: ' + sol.message)
+            print(msg)
+
+        dep_vals = sol.x
 
         for si, vi in zip(dep, dep_vals):
             self.initial_conditions[si] = vi

@@ -723,7 +723,7 @@ def test_system_with_constraints(plot=False):
     }
 
     sys.set_dependent_initial_conditions(dep=(z, u2, u3, u6),
-                                         use_jacobian=False, tol=1e-10)
+                                         use_jacobian=True, tol=1e-11)
 
     x0 = sys.initial_conditions
     np.testing.assert_allclose(x0[x], 1.0)
