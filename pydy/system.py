@@ -83,7 +83,7 @@ class System(object):
         constructing this ``System``.
     constants : dict, optional (default: all 1.0)
         This dictionary maps SymPy Symbol objects to floats.
-    specifieds : dict, optional (default: all 0)
+    specifieds : dict, optional (default: all 0.0)
         This dictionary maps SymPy Functions of time objects, or tuples of
         them, to floats, NumPy arrays, or functions of the state and time.
     ode_solver : function, optional (default: scipy.integrate.odeint)
@@ -102,6 +102,10 @@ class System(object):
         self._eom_method = eom_method
 
         # TODO : What if user adds symbols after constructing a System?
+        # TODO : For large equations of motion, these two methods can take
+        # unncessary time. One option is to let the user optionally pass in
+        # these lists of symbols or derive them from the constants and
+        # specifieds dictionaries.
         self._constants_symbols = self._Kane_constant_symbols()
         self._specifieds_symbols = self._Kane_undefined_dynamicsymbols()
 
@@ -804,7 +808,8 @@ class System(object):
     def evaluate_ode(self, x=None, t=None):
         """Returns the right hand side of the differential equations. The
         default is to evaluate at the set initial_conditions at the first time
-        value. Pass in optional arguments to override this.
+        value. Pass in optional arguments to override using the initial state
+        and time.
 
         Parameters
         ==========
@@ -821,9 +826,19 @@ class System(object):
         Notes
         =====
 
+        This method is present for convenience, it is not designed to be used
+        where performance matters, use :py:meth:`System.evaluate_ode_function`
+        directly when performance is needed.
+
         To see the order of the state values use::
 
-            help(system.evaluate_ode_function)
+            >>> system = System(...)
+            >>> system.states
+
+        or::
+
+            >>> system.generate_ode_function()
+            >>> help(system.evaluate_ode_function)
 
         """
         x_default, args = self._prep_for_evaluate()
