@@ -243,7 +243,7 @@ class System(object):
             sys.specifieds = {(a, b, c): np.ones(3), d: lambda x, t: -3 * x[0]}
             sys.specifieds = {(a, b, c): lambda x, t: np.ones(3)}
 
-         Here are examples for (2):
+        Here are examples for (2)::
 
             sys.specifieds = {'symbols': (a, b, c, d),
                               'values': np.ones(4)}
@@ -739,12 +739,14 @@ class System(object):
 
         Notes
         -----
+
         If the Cython generator is selected and you have a custom
-        ``ode_solver`` set, either ensure that solver only passes C contiguous
-        arrays to the generated ode function or set the kwarg
-        ``force_c_contiguous`` to ``True``. Forcing C contiguous arrays
-        introduces a performance penalty due to the necessity of copying
-        arrays.
+        ``ode_solver`` set, keyword argument ``force_c_contiguous`` will be
+        automatically set to ``True``. You can disable this by setting it to
+        ``False`` but you must ensure ensure that ode solver only passes C
+        contiguous arrays to the generated ode function. Forcing C contiguous
+        arrays introduces a small performance penalty due to the necessity of
+        copying arrays.
 
         """
 
