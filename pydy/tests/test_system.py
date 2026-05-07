@@ -329,6 +329,9 @@ class TestSystem():
         with testing.assert_raises(ValueError):
                 self.sys.initial_conditions = {sm.symbols('f0'): 7.3}
 
+        with pytest.raises(ValueError):
+            self.sys.set_dependent_initial_conditions()
+
     def test_generate_ode_function(self):
 
         rhs = self.sys.generate_ode_function()
@@ -722,8 +725,8 @@ def test_system_with_constraints(plot=False):
         u6: u6_guess,  #speed/sys.constants[r],
     }
 
-    sys.set_dependent_initial_conditions(dep=(z, u2, u3, u6),
-                                         use_jacobian=True, tol=1e-11)
+    sys.set_dependent_initial_conditions(dep_vars=(z, u2, u3, u6),
+                                         use_jac=True, tol=1e-11)
 
     x0 = sys.initial_conditions
     np.testing.assert_allclose(x0[x], 1.0)

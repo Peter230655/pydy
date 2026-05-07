@@ -481,7 +481,7 @@ guesses for the dependent states.
 
 .. jupyter-execute::
 
-    sys.set_dependent_initial_conditions(dep=(q5, u2, u3, u5, u6, u8))
+    sys.set_dependent_initial_conditions(dep_vars=(q5, u2, u3, u5, u6, u8))
     sys.initial_conditions
 
 Check if the initial conditions satisfy the constraints.

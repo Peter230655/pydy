@@ -635,25 +635,25 @@ class System(object):
         else:
             return self._eval_constraints(x, p).squeeze()
 
-    def set_dependent_initial_conditions(self, dep=None, use_jacobian=False,
-                                         tol=1e-12):
+    def set_dependent_initial_conditions(self, dep_vars=None, use_jac=False,
+                                         **root_kwargs):
         """Sets the initial conditions of the dependent coordinates and
         dependent speeds using the holonomic and nonholonomic constraints,
         respectively.
 
         Parameters
         ==========
-        dep : iterable of Function()(t), optional
+        dep_vars : iterable of Function()(t), optional
             Dependent coordinates and speeds to solve for. The number of
             coordinates should be equal to the number of holonomic constraints.
             The number of speeds should be equal to the number of nonholonic
             constraints. If None, the dependent coordinates and speeds are
             those used in KanesMethod instantiation.
-        use_jacobian : boolean, optional
+        use_jac : boolean, optional
             If true the Jacobian of the constraint equations will be used to
             solve the constraint equations for the dependent states.
-        tol : float
-            Tolerance for the solution to meet.
+        root_kwargs
+            Extra keyword arguments that are passed to ``scipy.optimize.root``.
 
         """
         # TODO : The nonholonomic constraints can be solved analytically, root
@@ -667,24 +667,25 @@ class System(object):
             num_holo = len(self.eom_method._f_h)
             num_nonh = self.eom_method._k_nh.shape[0]
 
-        if dep is None:
-            dep = self.eom_method._qdep[:] + self.eom_method._udep[:]
+        # TODO : These should be publicly accessible on KanesMethod.
+        if dep_vars is None:
+            dep_vars = self.eom_method._qdep[:] + self.eom_method._udep[:]
 
         # TODO : Would be nice to check if the dependent variables are present
         # in the constraints and that the right number of coordinates and
         # speeds are each supplied.
-        if len(dep) != num_holo + num_nonh:
+        if len(dep_vars) != num_holo + num_nonh:
             msg = (f'You must supply {num_holo} dependent coordinates and '
                    f'{num_nonh} dependent speeds.')
             raise ValueError(msg)
 
         x = self._initial_conditions_array
         p = self._constants_array
-        dep_guess = [self.initial_conditions[xi] for xi in dep]
-        dep_idxs = [self.states.index(xi) for xi in dep]
+        dep_guess = [self.initial_conditions[xi] for xi in dep_vars]
+        dep_idxs = [self.states.index(xi) for xi in dep_vars]
 
-        if use_jacobian:
-            jac = self._all_constraints.jacobian(dep)
+        if use_jac:
+            jac = self._all_constraints.jacobian(dep_vars)
             eval_jac = sm.lambdify((self.states, self.constants_symbols), jac,
                                    cse=True)
 
@@ -701,16 +702,21 @@ class System(object):
 
             fprime = False
 
-        sol = root(eval_f, dep_guess, args=(p,), jac=fprime, tol=tol)
+        # not settable by the user, so overwrite:
+        root_kwargs['args'] = (p, )
+        root_kwargs['jac'] = fprime
+
+        sol = root(eval_f, dep_guess, **root_kwargs)
         if not sol.success:
-            msg = ('Failed to find a solution. Maybe a better guess will help '
-                   'or you may have to manually solve for the dependent '
-                   'coordinates. SciPy root() failure message: ' + sol.message)
+            msg = ('Failed to find a solution that meets tolerance. Maybe a '
+                   'better guess will help or you may have to manually solve '
+                   'for the dependent coordinates. SciPy root() failure '
+                   'message: ' + sol.message)
             warnings.warn(msg, PyDyUserWarning, stacklevel=2)
 
         dep_vals = sol.x
 
-        for si, vi in zip(dep, dep_vals):
+        for si, vi in zip(dep_vars, dep_vals):
             self.initial_conditions[si] = vi
 
     def generate_ode_function(self, **kwargs):
