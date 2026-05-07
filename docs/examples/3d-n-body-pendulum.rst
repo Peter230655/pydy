@@ -406,13 +406,7 @@ The accelerations needed are calculated numerically and stored in ``RHS``
 
 .. jupyter-execute::
 
-    rhs_gen = sys.evaluate_ode
-
-    RHS = np.empty((resultat.shape))
-    for i in range(resultat.shape[0]):
-        for j, key in enumerate(sys.initial_conditions.keys()):
-            sys.initial_conditions[key] = resultat[i, j]
-        RHS[i] = rhs_gen()
+    RHS = sys.evaluate_ode(x=resultat, t=sys.times)
 
 
     react_x = np.empty(resultat.shape[0])
