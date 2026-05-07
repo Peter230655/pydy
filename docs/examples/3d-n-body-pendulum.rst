@@ -290,17 +290,9 @@ Create a specific ODE solver.
 
 .. jupyter-execute::
 
-    def ode_solver(func, y0, times, args=(), **kwargs):
-        res = solve_ivp(lambda t, y, *args: func(y, t, *args),
-                       (times[0], times[-1]),
-                        y0,
-                        args=args,
-                        t_eval=times,
-                        method='Radau',
-                        atol=1.e-8,
-                        rtol=1.e-8,
-                        **kwargs)
-        return res.y.T
+    def ode_solver(f, x0, ts, args=(), **kwargs):
+        return solve_ivp(lambda t, x: f(x, t, *args), ts[[0, -1]], x0,
+                     t_eval=ts, **kwargs).y.T
 
 
 Initialize an instance of System. If an ODE solver is specified, it must
@@ -391,9 +383,8 @@ Numerical Integration
     sys.generate_ode_function(generator='cython', linear_sys_solver='numpy')
 
     sys.times = np.linspace(0., 5.0, 500)
-    times = sys.times   # for later use
 
-    resultat = sys.integrate()
+    resultat = sys.integrate(method='Radau', atol=1.e-8, rtol=1.e-8)
 
     print('resultat shape', resultat.shape)
 
@@ -406,7 +397,7 @@ The accelerations needed are calculated numerically and stored in ``RHS``
 
 .. jupyter-execute::
 
-    RHS = sys.evaluate_ode(x=resultat, t=sys.times)
+    RHS = sys.evaluate_ode(x=resultat)
 
 
     react_x = np.empty(resultat.shape[0])
@@ -440,7 +431,7 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
     total_np = np.empty(schritte)
 
     for i in range(schritte):
-        zeit = times[i]
+        zeit = sys.times[i]
         pot_np[i] = pot_lam(*[resultat[i, j]
                               for j in range(resultat.shape[1])],
                             *pL_vals)
@@ -460,25 +451,25 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
 
     fig, ax = plt.subplots(4, 1, figsize=(8, 10), layout='constrained',
                            sharex=True)
-    ax[0].plot(times, pot_np, label='gravitational potential energy')
-    ax[0].plot(times, kin_np, label='kinetic energy')
-    ax[0].plot(times, spring_np, label='spring potential energy')
-    ax[0].plot(times, total_np, label='total energy')
+    ax[0].plot(sys.times, pot_np, label='gravitational potential energy')
+    ax[0].plot(sys.times, kin_np, label='kinetic energy')
+    ax[0].plot(sys.times, spring_np, label='spring potential energy')
+    ax[0].plot(sys.times, total_np, label='total energy')
     msg = r'$\mu$'
     ax[0].set_title(f"Energies of the system, {msg} "
                     f"= {sys.constants[reibung]}")
     _ = ax[0].legend()
 
     for i in range(n, 2*n):
-        ax[1].plot(times, resultat[:, 3*i+1], label='rotational speed of '
+        ax[1].plot(sys.times, resultat[:, 3*i+1], label='rotational speed of '
                    f'body {i - n} in Y direction in its coordinate system')
     ax[1].set_title('Rotational speeds')
     ax[1].set_ylabel('Rotational speed')
     _ = ax[1].legend()
 
-    ax[2].plot(times, react_x, label='reaction_X')
-    ax[2].plot(times, react_y, label='reaction_Y')
-    ax[2].plot(times, react_z, label='reaction_Z')
+    ax[2].plot(sys.times, react_x, label='reaction_X')
+    ax[2].plot(sys.times, react_y, label='reaction_Y')
+    ax[2].plot(sys.times, react_z, label='reaction_Z')
     ax[2].set_title('Reaction forces at the suspension point')
     ax[2].set_xlabel('Time')
     ax[2].set_ylabel('Reaction force [N]')
@@ -496,15 +487,15 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
               'constant is '
               f'{error:.5f} % of max. angular momentum')
     ax[3].plot(
-        times, ang_momentum_lam(
+        sys.times, ang_momentum_lam(
             *[resultat[:, j] for j in range(resultat.shape[1])],
             *pL_vals)[0], label='Angular momentum X')
     ax[3].plot(
-        times, ang_momentum_lam(
+        sys.times, ang_momentum_lam(
             *[resultat[:, j] for j in range(resultat.shape[1])],
             *pL_vals)[1], label='Angular momentum Y')
     ax[3].plot(
-        times, ang_momentum_lam(
+        sys.times, ang_momentum_lam(
             *[resultat[:, j] for j in range(resultat.shape[1])],
             *pL_vals)[2], label='Angular momentum Z')
     ax[3].set_title('Angular momentum')
@@ -554,7 +545,7 @@ found by trial and error.
 
     scene = Scene(N, P0, *viz_frames)
 
-    scene.times = times
+    scene.times = sys.times
     pL_vals_scene = [val / groesse for val in pL_vals]
     scene.constants = dict(zip(pL, pL_vals_scene))
     scene.states_symbols = q + u
