@@ -13,8 +13,6 @@ Objectives
 ----------
 
 - Show how to use ``PyDy Visualization`` to generate a 3D animation.
-- Show how to calculate the reaction forces with ``System`` if the
-  reaction forces do not appear in the force vector.
 - Show how to use a specific ODE_solver.
 
 
@@ -83,13 +81,6 @@ Equations of Motion, Kane's Method
     rhs_subs = []  # substitutes for the rhs, to calculate the reaction forces
 
 
-Virtual speeds and reaction forces needed to get the reaction forces at the
-suspension point P0.
-
-.. jupyter-execute::
-
-    auxx, auxy, auxz, fx, fy, fz = me.dynamicsymbols(
-        'auxx, auxy, auxz, fx, fy, fz')
 
 Define the general coordinates, the gen. speeds, the frames and the points.
 
@@ -121,8 +112,6 @@ The lists rot, rot1 are needed for the kinematical equations, see below.
 It is important, that the angular speeds be expressed in terms of
 the 'child frame', otherwise the equations of motion become very large.
 
-Note the virtual speeds at P[0], the suspension point.
-
 .. jupyter-execute::
 
     A[0].orient_body_fixed(N, (q[0], q[1], q[2]), '123')
@@ -141,7 +130,7 @@ Locate the various points, and define their speeds.
 .. jupyter-execute::
 
     P[0].set_pos(P0, 0.)
-    P[0].set_vel(N, auxx*N.x + auxy*N.y + auxz*N.z)  # Suspension point.
+    P[0].set_vel(N, 0)  # Suspension point.
     Dmc[0].set_pos(P[0], l/2. * A[0].y)
     Dmc_link[0].set_pos(P[0], l/2. * A[0].y)
     Dmc_link[0].v2pt_theory(P[0], N, A[0])
@@ -190,15 +179,13 @@ There are:
 - potential spring forces when the balls penetrate each other
 - dissipative friction forces due to friction between rods and balls
 
-Note how the reaction forces at P[0] are set up.
-
 .. jupyter-execute::
 
     FG = ([(Dmc[i], -m*g*N.y) for i in range(n)] +
           [(punkt[i], -m1*g*N.y)for i in range(n)] +
           [(Dmc_link[i], -m_link*g*N.y) for i in range(n)])
 
-    FB = [(P[0], fx*N.x + fy*N.y + fz*N.z)]
+    FB = []
     for i in range(n):
         for j in range(i+1, n):
             aa = Dmc[j].pos_from(Dmc[i])
@@ -229,33 +216,18 @@ are used.
         for uv in A[i]:
             kd.append(me.dot(rot[i] - rot1[i], uv))
 
-Kanes's Equations
------------------
+Finish Kanes's equations.
 
 .. jupyter-execute::
 
     q1 = q
     u1 = u
-    aux = [auxx, auxy, auxz]
 
-    KM = me.KanesMethod(N, q_ind=q1, u_ind=u1, kd_eqs=kd, u_auxiliary=aux)
+    KM = me.KanesMethod(N, q_ind=q1, u_ind=u1, kd_eqs=kd)
     fr, frstar = KM.kanes_equations(BODY, FL)
 
-    react_forces = KM.auxiliary_eqs
 
-The reaction forces (of course) contain accelerations.
-They are replaced by ``rhs`` as place holders and will be calculated
-numerically below. Symbolic calculation would be possible too, but
-time consuming.
-
-.. jupyter-execute::
-
-    react_forces = me.msubs(react_forces, {u[i].diff(t): rhs_subs[i]
-                                           for i in range(len(u))})
-
-
-Energy, Momentum
-----------------
+Define the energies.
 
 .. jupyter-execute::
 
@@ -266,8 +238,7 @@ Energy, Momentum
         sum([m_link*g*me.dot(Dmc_link[i].pos_from(P[0]), N.y)
         for i in range(n)]))
 
-    kin_energie = me.msubs(sum([BODY[i].kinetic_energy(N)
-                                for i in range(3*n)]), {i: 0 for i in aux})
+    kin_energie = sum([BODY[i].kinetic_energy(N) for i in range(3*n)])
     spring_energie = sm.S(0.)
     for i in range(n):
         for j in range(i+1, n):
@@ -275,15 +246,6 @@ Energy, Momentum
             bb = aa.magnitude()
             aa = aa.normalize()
             spring_energie += 0.5 * k * (2*r - bb)**2 * sm.Heaviside(2.*r - bb)
-
-    aux_dict = {i: 0 for i in aux}
-    ang_moment_x = sum([body.angular_momentum(P0, N).dot(N.x).subs(aux_dict)
-                        for body in BODY])
-    ang_moment_y = sum([body.angular_momentum(P0, N).dot(N.y).subs(aux_dict)
-                        for body in BODY])
-    ang_moment_z = sum([body.angular_momentum(P0, N).dot(N.z).subs(aux_dict)
-                        for body in BODY])
-    ang_momentum = [ang_moment_x, ang_moment_y, ang_moment_z]
 
 
 Create a specific ODE solver.
@@ -366,9 +328,6 @@ Dmc_loc, punkt_loc are needed for the animation only.
 
     Dmc_loc_lam = sm.lambdify(qL + pL, Dmc_loc, cse=True)
     punkt_loc_lam = sm.lambdify(qL + pL, punkt_loc, cse=True)
-    eingepraegt_lam = sm.lambdify([fx, fy, fz] + qL + pL + rhs_subs,
-                                  react_forces, cse=True)
-    ang_momentum_lam = sm.lambdify(qL + pL, ang_momentum, cse=True)
 
     # For later use.
     pL_vals = [sys.constants[p] for p in pL]
@@ -389,38 +348,8 @@ Numerical Integration
     print('resultat shape', resultat.shape)
 
 
-Calculate the Reaction Forces at the Suspension Point
------------------------------------------------------
-
-The accelerations needed are calculated numerically and stored in ``RHS``
-
-
-.. jupyter-execute::
-
-    RHS = sys.evaluate_ode(x=resultat)
-
-
-    react_x = np.empty(resultat.shape[0])
-    react_y = np.empty(resultat.shape[0])
-    react_z = np.empty(resultat.shape[0])
-
-
-    def func_react(x0, args):
-        return eingepraegt_lam(*x0, *args).squeeze()
-
-
-    x0 = np.array([0., 0., 0.])
-    for i in range(resultat.shape[0]):
-        args = np.array([*resultat[i], *pL_vals, *RHS[i, 3*n:]])
-        loesung = root(func_react, x0, args=args)
-        react_x[i] = loesung.x[0]
-        react_y[i] = loesung.x[1]
-        react_z[i] = loesung.x[2]
-        x0 = loesung.x
-
-
-Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
------------------------------------------------------------------
+Plot Energy and Angular Speeds
+------------------------------
 
 .. jupyter-execute::
 
@@ -449,7 +378,7 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
         print('deviation of total energy from constant is {:.5f} % of max. '
               'total energy'.format((total_max - total_min)/total_max*100))
 
-    fig, ax = plt.subplots(4, 1, figsize=(8, 10), layout='constrained',
+    fig, ax = plt.subplots(2, 1, figsize=(8, 5), layout='constrained',
                            sharex=True)
     ax[0].plot(sys.times, pot_np, label='gravitational potential energy')
     ax[0].plot(sys.times, kin_np, label='kinetic energy')
@@ -458,49 +387,15 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
     msg = r'$\mu$'
     ax[0].set_title(f"Energies of the system, {msg} "
                     f"= {sys.constants[reibung]}")
-    _ = ax[0].legend()
+    ax[0].legend()
 
     for i in range(n, 2*n):
         ax[1].plot(sys.times, resultat[:, 3*i+1], label='rotational speed of '
                    f'body {i - n} in Y direction in its coordinate system')
     ax[1].set_title('Rotational speeds')
     ax[1].set_ylabel('Rotational speed')
-    _ = ax[1].legend()
+    ax[1].legend()
 
-    ax[2].plot(sys.times, react_x, label='reaction_X')
-    ax[2].plot(sys.times, react_y, label='reaction_Y')
-    ax[2].plot(sys.times, react_z, label='reaction_Z')
-    ax[2].set_title('Reaction forces at the suspension point')
-    ax[2].set_xlabel('Time')
-    ax[2].set_ylabel('Reaction force [N]')
-    _ = ax[2].legend()
-
-    max_y = np.max(ang_momentum_lam(*[resultat[:, j]
-                                      for j in range(resultat.shape[1])],
-                                *pL_vals)[1])
-    min_y = np.min(ang_momentum_lam(*[resultat[:, j]
-                                      for j in range(resultat.shape[1])],
-                                *pL_vals)[1])
-    error = (max_y - min_y) / max_y * 100.
-    if abs(max_y) > 1.0:
-        print('deviation of Y - component of ang. momentum from being '
-              'constant is '
-              f'{error:.5f} % of max. angular momentum')
-    ax[3].plot(
-        sys.times, ang_momentum_lam(
-            *[resultat[:, j] for j in range(resultat.shape[1])],
-            *pL_vals)[0], label='Angular momentum X')
-    ax[3].plot(
-        sys.times, ang_momentum_lam(
-            *[resultat[:, j] for j in range(resultat.shape[1])],
-            *pL_vals)[1], label='Angular momentum Y')
-    ax[3].plot(
-        sys.times, ang_momentum_lam(
-            *[resultat[:, j] for j in range(resultat.shape[1])],
-            *pL_vals)[2], label='Angular momentum Z')
-    ax[3].set_title('Angular momentum')
-    ax[3].set_ylabel('Angular momentum [kg*m^2/s]')
-    _ = ax[3].legend()
 
 Animation with PyDy Visualization
 =================================
