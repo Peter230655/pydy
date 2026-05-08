@@ -382,9 +382,9 @@ Numerical Integration
 
     sys.generate_ode_function(generator='cython', linear_sys_solver='numpy')
 
-    sys.times = np.linspace(0., 5.0, 500)
+    sys.times = np.linspace(0., 2.0, 50)
 
-    resultat = sys.integrate(method='Radau', atol=1.e-8, rtol=1.e-8)
+    resultat = sys.integrate(method='Radau', atol=1.e-6, rtol=1.e-6)
 
     print('resultat shape', resultat.shape)
 
@@ -482,7 +482,7 @@ Plot Energy, Angular Speeds, Reaction Forces and Angular Momentum
                                       for j in range(resultat.shape[1])],
                                 *pL_vals)[1])
     error = (max_y - min_y) / max_y * 100.
-    if abs(max_y) > 1.e-3:
+    if abs(max_y) > 1.0:
         print('deviation of Y - component of ang. momentum from being '
               'constant is '
               f'{error:.5f} % of max. angular momentum')
