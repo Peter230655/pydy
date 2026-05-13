@@ -775,3 +775,92 @@ def test_system_with_constraints(plot=False):
             ax.plot(sys.times, traj)
 
         plt.show()
+
+
+def test_system_with_noncontributing_forces(plot=False):
+    m1, m2, l1, l2, c, g = sm.symbols('m1, m2, l1, l2, c, g')
+    q1, q2, u1, u2, T1, T2 = me.dynamicsymbols('q1, q2, u1, u2, T1, T2')
+    u3, u4 = me.dynamicsymbols('u3, u4')
+
+    N = me.ReferenceFrame('N')
+    A = me.ReferenceFrame('A')
+    B = me.ReferenceFrame('B')
+
+    A.orient_axis(N, q1, N.z)
+    B.orient_axis(N, q2, N.z)
+    A.set_ang_vel(N, u1*N.z)
+    B.set_ang_vel(N, u2*N.z)
+
+    O = me.Point('O')
+    P1 = O.locatenew('P1', -l1*A.y)
+    P2 = P1.locatenew('P2', -l2*B.y)
+
+    O.set_vel(N, 0)
+    P1.v2pt_theory(O, N, A)
+    P1.set_vel(N, P1.vel(N) - u3*A.y)
+    P2.v2pt_theory(P1, N, B)
+    P2.set_vel(N, P2.vel(N) - u4*B.y)
+
+    bob1 = me.Particle('bob1', P1, m1)
+    bob2 = me.Particle('bob2', P2, m2)
+
+    loads = (
+        (P1, -m1*g*N.y + T1*A.y - T2*B.y),
+        (P2, -m2*g*N.y + T2*B.y),
+        (A, -c*u1*N.z + c*(u2 - u1)*N.z),
+        (B, - c*(u2 - u1)*N.z),
+    )
+
+    kane = me.KanesMethod(
+        N,
+        (q1, q2),
+        (u1, u2),
+        kd_eqs=[q1.diff() - u1, q2.diff() - u2],
+        bodies=(bob1, bob2),
+        forcelist=loads,
+        u_auxiliary=(u3, u4),
+    )
+    kane.kanes_equations()
+
+    sys = System(kane)
+
+    sys.constants = {
+        m1: 1.0,
+        m2: 2.0,
+        l1: 1.0,
+        l2: 2.0,
+        c: 1.0,
+        g: 9.81,
+    }
+
+    sys.constraint_loads = (T1, T2)
+
+    sys.initial_conditions = {
+        q1: 0.1,
+        q2: 0.0,
+    }
+
+    rhs = sys.generate_ode_function()
+    print(rhs.__doc__)
+
+    sys.times = np.linspace(0.0, 4.0, num=400)
+    print(sys.evaluate_ode())
+
+    x_traj = sys.integrate()
+    xdot_traj = sys.evaluate_ode(x=x_traj)
+
+    if plot:
+        import matplotlib.pyplot as plt
+
+        fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
+                                 layout='constrained')
+        for ax, traj, s in zip(axes, x_traj.T, sys.states):
+            ax.plot(sys.times, traj)
+            ax.set_ylabel(s)
+
+        fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
+                                 layout='constrained')
+        for ax, traj in zip(axes, xdot_traj.T):
+            ax.plot(sys.times, traj)
+
+        plt.show()

@@ -102,6 +102,11 @@ class System(object):
 
         self._eom_method = eom_method
 
+        if constraint_loads is not None:
+            self.constraint_loads = constraint_loads
+        else:
+            self._constraint_loads = constraint_loads
+
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
         # unncessary time. One option is to let the user optionally pass in
@@ -134,11 +139,6 @@ class System(object):
             self.times = []
         else:
             self.times = times
-
-        if constraint_loads is not None:
-            self.constraint_loads = constraint_loads
-        else:
-            self._constraint_loads = constraint_loads
 
         self._evaluate_ode_function = None
 
@@ -441,15 +441,15 @@ class System(object):
             msg = ('The KanesMethod object has no auxiliary equations and '
                    'thus constraint loads cannot be provided.')
             raise RuntimeError(msg)
-        if (constraint_loads) != len(self.eom_method._uaux):
+        if len(constraint_loads) != len(self.eom_method._uaux):
             msg = ('You must provide symbols for {} constraint loads that '
                     'are present in the auxiliary equations.')
-            raise ValueError(msg.format(len(self._uaux)))
+            raise ValueError(msg.format(len(self.eom_method._uaux)))
         # TODO : Check that the constraint loads are present in the auxiliary
         # equations and that they are not a coordinate, speed, or specified.
         # dj/dt = j' = constraint_load
         # create some dummy impulse states
-        self._constraint_loads = constraint_loads
+        self._constraint_loads = list(constraint_loads)
         self.constraint_impulses = dynamicsymbols(
             ','.join(['j_{' + si.name + '}' for si in
                         self.constraint_loads]))
@@ -457,8 +457,10 @@ class System(object):
         # like so:
         # [Md  0] [u'] = [Fd]
         # [Mu Mj] [j']   [Fa]
-        aux_eqs = self.eom_method.auxiliary_equations
-        x = self.speeds.diff(dynamicsymbols._t).col_join(self.constraint_loads)
+        aux_eqs = self.eom_method.auxiliary_eqs
+        u = sm.Matrix(self.speeds)
+        lam = sm.Matrix(self.constraint_loads)
+        x = u.diff(dynamicsymbols._t).col_join(lam)
         self._aux_mass_matrix = aux_eqs.jacobian(x)  # [Mu Mj]
         self._aux_forcing = -aux_eqs.xreplace({fi: 0 for fi in x})  # [Fa]
 
