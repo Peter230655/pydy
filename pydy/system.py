@@ -135,28 +135,10 @@ class System(object):
         else:
             self.times = times
 
-        # TODO : Move to constraint_load setter
-        if constraint_loads is not None and self._uaux:
-            if (constraint_loads) != len(self._uaux):
-                msg = 'You must provide symbols for {} constraint loads.'
-                raise ValueError(msg.format(len(self._uaux)))
-            # TODO : Check that the constraint loads are present in the
-            # auxiliary equations and that they are not a coordinate, speed, or
-            # specified.
+        if constraint_loads is not None:
             self.constraint_loads = constraint_loads
-            # dj/dt = j' = constraint_load
-            # create some dummy impulse states
-            self.constraint_impulses = dynamicsymbols(
-                ','.join(['j_{' + si.name + '}' for si in
-                          self.constraint_loads]))
-            # The auxiliary equations augment the dynamical differential
-            # equations like so:
-            # [Md  0] [u'] = [Fd]
-            # [Mu Mj] [j']   [Fa]
-            aux_eqs = self.eom_method.auxiliary_equations
-            x = self.speeds.diff()[:] + self.constraint_loads
-            self._aux_mass_matrix = aux_eqs.jacobian(x)  # [Mu Mj]
-            self._aux_forcing = -aux_eqs.xreplace({fi: 0 for fi in x})  # [Fa]
+        else:
+            self._constraint_loads = constraint_loads
 
         self._evaluate_ode_function = None
 
@@ -181,7 +163,7 @@ class System(object):
         matrix and forcing vector.
 
         """
-        if self.constraint_loads:
+        if self.constraint_loads is not None:
             return self.coordinates + self.speeds + self.constraint_impulses
         else:
             return self.coordinates + self.speeds
@@ -448,11 +430,37 @@ class System(object):
 
     @property
     def constraint_loads(self):
-        """Tuple of symbolic functions of time representing the constraint
-        loads (forces & torques) associated with noncontributing loads.
-
-        """
+        """Column matrix of symbolic functions of time representing the
+        constraint loads (forces & torques) associated with noncontributing
+        loads."""
         return self._constraint_loads
+
+    @constraint_loads.setter
+    def constraint_loads(self, constraint_loads):
+        if not hasattr(self.eom_method, 'auxiliary_eqs'):
+            msg = ('The KanesMethod object has no auxiliary equations and '
+                   'thus constraint loads cannot be provided.')
+            raise RuntimeError(msg)
+        if (constraint_loads) != len(self.eom_method._uaux):
+            msg = ('You must provide symbols for {} constraint loads that '
+                    'are present in the auxiliary equations.')
+            raise ValueError(msg.format(len(self._uaux)))
+        # TODO : Check that the constraint loads are present in the auxiliary
+        # equations and that they are not a coordinate, speed, or specified.
+        # dj/dt = j' = constraint_load
+        # create some dummy impulse states
+        self._constraint_loads = constraint_loads
+        self.constraint_impulses = dynamicsymbols(
+            ','.join(['j_{' + si.name + '}' for si in
+                        self.constraint_loads]))
+        # The auxiliary equations augment the dynamical differential equations
+        # like so:
+        # [Md  0] [u'] = [Fd]
+        # [Mu Mj] [j']   [Fa]
+        aux_eqs = self.eom_method.auxiliary_equations
+        x = self.speeds.diff(dynamicsymbols._t).col_join(self.constraint_loads)
+        self._aux_mass_matrix = aux_eqs.jacobian(x)  # [Mu Mj]
+        self._aux_forcing = -aux_eqs.xreplace({fi: 0 for fi in x})  # [Fa]
 
     @property
     def evaluate_ode_function(self):
