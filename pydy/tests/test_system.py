@@ -778,6 +778,7 @@ def test_system_with_constraints(plot=False):
 
 
 def test_system_with_noncontributing_forces(plot=False):
+    # double simple pendulum with damping
     m1, m2, l1, l2, c, g = sm.symbols('m1, m2, l1, l2, c, g')
     q1, q2, u1, u2, T1, T2 = me.dynamicsymbols('q1, q2, u1, u2, T1, T2')
     u3, u4 = me.dynamicsymbols('u3, u4')
@@ -833,6 +834,9 @@ def test_system_with_noncontributing_forces(plot=False):
         g: 9.81,
     }
 
+    with pytest.raises(ValueError):  # too many symbols
+        sys.constraint_loads = (T1, T2, u1)
+
     sys.constraint_loads = (T1, T2)
 
     sys.initial_conditions = {
@@ -856,11 +860,14 @@ def test_system_with_noncontributing_forces(plot=False):
                                  layout='constrained')
         for ax, traj, s in zip(axes, x_traj.T, sys.states):
             ax.plot(sys.times, traj)
-            ax.set_ylabel(s)
+            ax.set_ylabel(sm.latex(s, mode='inline'))
 
         fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
                                  layout='constrained')
-        for ax, traj in zip(axes, xdot_traj.T):
+        for ax, traj, s in zip(axes, xdot_traj.T,
+                               [xi.diff() for xi in sys.coordinates + sys.speeds] +
+                               sys.constraint_loads):
             ax.plot(sys.times, traj)
+            ax.set_ylabel(sm.latex(s, mode='inline'))
 
         plt.show()

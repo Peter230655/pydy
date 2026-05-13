@@ -94,6 +94,11 @@ class System(object):
         An array_like object, which contains time values over which
         equations are integrated. It has to be supplied before
         System.integrate() can be called.
+    constraint_loads : iterable of Functions of time, optional
+        If the ``eom_method`` includes noncontributig forces (Kane's method) or
+        constraint forces from Lagrange multipliers, provide a list of variable
+        names for these forces and they will be computed when evaluating the
+        differential equations.
 
     """
     def __init__(self, eom_method, constants=None, specifieds=None,
@@ -102,10 +107,12 @@ class System(object):
 
         self._eom_method = eom_method
 
-        if constraint_loads is not None:
-            self.constraint_loads = constraint_loads
+        # NOTE: must be set before the state variables are intialized, so do
+        # this first
+        if constraint_loads is None:
+            self._constraint_loads = []
         else:
-            self._constraint_loads = constraint_loads
+            self.constraint_loads = constraint_loads
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
@@ -163,7 +170,10 @@ class System(object):
         matrix and forcing vector.
 
         """
-        if self.constraint_loads is not None:
+        # TODO : Should I raise an error if there are auxlilary equations but
+        # constraint loads are not set? Also what if you call .states before
+        # setting the constraint_loads. Or initial_conditions before it?
+        if self.constraint_loads:
             return self.coordinates + self.speeds + self.constraint_impulses
         else:
             return self.coordinates + self.speeds
@@ -430,9 +440,8 @@ class System(object):
 
     @property
     def constraint_loads(self):
-        """Column matrix of symbolic functions of time representing the
-        constraint loads (forces & torques) associated with noncontributing
-        loads."""
+        """List of symbolic functions of time representing the constraint loads
+        (forces & torques) associated with noncontributing loads."""
         return self._constraint_loads
 
     @constraint_loads.setter
@@ -519,7 +528,7 @@ class System(object):
         kin_diff_rhs = sm.Matrix([kin_diff_dict[q.diff()] for q in
                                   self.coordinates])
 
-        if self.constraint_loads is not None:
+        if self.constraint_loads:
             Md = self.eom_method.mass_matrix
             MuMj = self._aux_mass_matrix
             Mz = sm.zeros(Md.shape[0], len(self.constraint_loads))
