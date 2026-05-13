@@ -415,10 +415,14 @@ class TestODEFunctionGenerator(object):
 
         self.sys = models.multi_mass_spring_damper(2)
         self.rhs = self.sys.eom_method.rhs()
+        kinetic_energy = []
+        for b in self.sys.eom_method.bodies:
+            kinetic_energy.append(b.kinetic_energy())
         self.generator = ODEFunctionGenerator(self.rhs,
                                               self.sys.coordinates,
                                               self.sys.speeds,
-                                              self.sys.constants_symbols)
+                                              self.sys.constants_symbols,
+                                              outputs=kinetic_energy)
 
     def test_init_full_rhs(self):
 
