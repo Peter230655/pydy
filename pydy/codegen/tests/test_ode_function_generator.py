@@ -123,7 +123,21 @@ def test_outputs():
                            dict(zip(x, x_vals))).xreplace(
                                (dict(zip(p, p_vals)))).evalf()[:], dtype=float)
 
-    for generator in ('lambdify', 'cython', 'symjit'):
+    generators = ['lambdify']
+    try:
+        import Cython
+    except ImportError:
+        pass
+    else:
+        generators.append('cython')
+    try:
+        import symjit
+    except ImportError:
+        pass
+    else:
+        generators.append('symjit')
+
+    for generator in generators:
         rhs = generate_ode_function(
             forcing,
             kane.q[:],
