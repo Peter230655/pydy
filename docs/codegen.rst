@@ -87,8 +87,7 @@ classes:
 
 .. code:: pycon
 
-   >>> from numpy import array
-   >>> from pydy.models import multi_mass_spring_damper
+   >>> import numpy as np
    >>> from pydy.codegen.ode_function_generators import generate_ode_function
    >>> sys = multi_mass_spring_damper()
    >>> sym_rhs = sys.eom_method.rhs()
@@ -96,7 +95,7 @@ classes:
    >>> u = sys.speeds
    >>> p = sys.constants_symbols
    >>> rhs = generate_ode_function(sym_rhs, q, u, p)
-   >>> rhs(array([1.0, 2.0]), 0.0, array([1.0, 2.0, 3.0]))
+   >>> rhs(np.array([1.0, 2.0]), 0.0, np.array([1.0, 2.0, 3.0]))
    array([ 2., -7.])
 
 Other backends can be used by passing in the ``generator`` keyword argument,
@@ -105,7 +104,7 @@ e.g.:
 .. code:: pycon
 
    >>> rhs = generate_ode_function(sym_rhs, q, u, p, generator='cython')
-   >>> rhs(array([1.0, 2.0]), 0.0, array([1.0, 2.0, 3.0]))
+   >>> rhs(np.array([1.0, 2.0]), 0.0, np.array([1.0, 2.0, 3.0]))
    array([ 2., -7.])
 
 The backends are implemented as subclasses of
@@ -117,14 +116,47 @@ make use of the ``ODEFunctionGenerator`` classes directly:
    >>> from pydy.codegen.ode_function_generators import LambdifyODEFunctionGenerator
    >>> g = LambdifyODEFunctionGenerator(sym_rhs, q, u, p)
    >>> rhs = g.generate()
-   >>> rhs(array([1.0, 2.0]), 0.0, array([1.0, 2.0, 3.0]))
+   >>> rhs(np.array([1.0, 2.0]), 0.0, np.array([1.0, 2.0, 3.0]))
    array([ 2., -7.])
 
-Furthermore, for direct control over evaluating matrices you can use the
-``lamdify`` and ``theano_functions`` in SymPy or utilize the
-:py:class:`~pydy.codegen.cython_code.CythonMatrixGenerator` class
-in PyDy. For example, this shows you how to generate C and Cython code to
-evaluate matrices:
+The ordinary differential equation generators also accept the implicit form of
+the equations in two other formats:
+
+.. code:: pycon
+
+   >>> M = sys.eom_method.mass_matrix_full
+   >>> F = sys.eom_method.forcing_full
+   >>> g = LambdifyODEFunctionGenerator(F, q, u, p, mass_matrix=M)
+   >>> rhs = g.generate()
+   >>> rhs(np.array([1.0, 2.0]), 0.0, np.array([1.0, 2.0, 3.0]))
+   array([ 2., -7.])
+
+.. code:: pycon
+
+   >>> from sympy import Matrix
+   >>> M = sys.eom_method.mass_matrix
+   >>> F = sys.eom_method.forcing
+   >>> qd = Matrix([sys.eom_method.kindiffdict()[qi.diff()] for qi in q])
+   >>> g = LambdifyODEFunctionGenerator(F, q, u, p, mass_matrix=M,
+   ...     coordinate_derivatives=qd)
+   >>> rhs = g.generate()
+   >>> rhs(np.array([1.0, 2.0]), 0.0, np.array([1.0, 2.0, 3.0]))
+   array([ 2., -7.])
+
+Additional output equations can also be simulatenously evaluated:
+
+.. code:: pycon
+
+   >>> outputs = Matrix([b.kinetic_energy(sys.eom_method._inertial) for b in sys.eom_method.bodies])
+   >>> g = LambdifyODEFunctionGenerator(sym_rhs, q, u, p, outputs=outputs)
+   >>> rhs = g.generate()
+   >>> rhs(np.array([1.0, 2.0]), 0.0, np.array([1.0, 2.0, 3.0]))
+   array([ 2., -7.]), array([6.0])
+
+Furthermore, for direct control over evaluating matrices you can use
+``lambdify`` in SymPy or utilize the
+:py:class:`~pydy.codegen.cython_code.CythonMatrixGenerator` class in PyDy. For
+example, this shows you how to generate C and Cython code to evaluate matrices:
 
 .. code:: pycon
 
