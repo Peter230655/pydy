@@ -152,7 +152,20 @@ def test_outputs():
         np.testing.assert_allclose(np.hstack((qdot_exp, udot_exp)), xdot)
         np.testing.assert_allclose(y_exp, y)
 
-    print(rhs.__doc__)
+    expected_end = \
+"""\
+y : ndarray, shape(7,)
+    Values of the provided outputs.
+        - y0(t)
+        - y1(t)
+        - y2(t)
+        - y3(t)
+        - y4(t)
+        - y5(t)
+        - y6(t)
+
+"""
+    assert rhs.__doc__.endswith(expected_end)
 
 
 def test_ccontiguous():
