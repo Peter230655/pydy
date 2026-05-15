@@ -209,7 +209,7 @@ y : ndarray, shape({num_outputs},)
             [3] M(q, p) u' = F(q, u, t, r, p)
                 q' = G(q, u, t, r, p)
 
-        The function can also optional return additional outputs in the form:
+        The function can also optionally return additional outputs in the form:
 
             y = H(x, t, r, p)
 
@@ -402,8 +402,8 @@ y : ndarray, shape({num_outputs},)
 
     @staticmethod
     def list_syms(indent, syms):
-        """Returns a string representation of a valid rst list of the
-        symbols in the sequence syms and indents the list given the integer
+        """Returns a string representation of a valid reStructuredText list of
+        the symbols in the sequence syms and indents the list given the integer
         number of indentations."""
         indentation = ' ' * indent
         lst = '- ' + ('\n' + indentation + '- ').join([str(s) for s in syms])
