@@ -831,6 +831,25 @@ def test_system_with_noncontributing_forces(plot=False):
     )
     kane.kanes_equations()
 
+    aux_eqs = kane.auxiliary_eqs
+    u = sm.Matrix([u1, u2])
+    lam = sm.Matrix([T1, T2])
+    x = u.diff().col_join(lam)
+    MuMj = aux_eqs.jacobian(x)  # [Mu Mj]
+    Fa = -aux_eqs.xreplace({fi: 0 for fi in x})  # [Fa]
+    Md = kane.mass_matrix
+    Mz = sm.zeros(Md.shape[0], 2)
+    mass_matrix = Md.row_join(Mz).col_join(MuMj)
+    Fd = kane.forcing
+    forcing = Fd.col_join(Fa)
+    xdot = mass_matrix.cramer_solve(forcing)
+    ke = m1/2*P1.vel(N).dot(P1.vel(N)) + m2/2*P2.vel(N).dot(P2.vel(N))
+    acc_func = xdot[0, 0]**2 + xdot[1, 0]**2
+    stress = xdot[1, 0]/l2**2
+    constraint = P2.pos_from(O) - sm.sin(2)
+
+    pause
+
     sys = System(kane)
 
     sys.constants = {

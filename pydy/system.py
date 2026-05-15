@@ -103,7 +103,7 @@ class System(object):
     """
     def __init__(self, eom_method, constants=None, specifieds=None,
                  ode_solver=None, initial_conditions=None, times=None,
-                 constraint_loads=None):
+                 outputs=None, constraint_loads=None):
 
         self._eom_method = eom_method
         self._extract_constraints()
@@ -114,6 +114,11 @@ class System(object):
             self._constraint_loads = []
         else:
             self.constraint_loads = constraint_loads
+
+        if outputs is None:
+            self._outputs = []
+        else:
+            self.outputs = outputs
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
@@ -471,6 +476,66 @@ class System(object):
     def _initial_conditions_array(self):
         x0_dict = self._initial_conditions_padded_with_defaults()
         return np.array([x0_dict[xi] for xi in self.states])
+
+    @property
+    def outputs(self):
+        return self._outputs
+
+    @outputs.setter
+    def outputs(self, outputs):
+        self._outputs = outputs
+
+    def _assemble_outputs(self):
+        # Divide the equations into three types:
+        # 1. Equations that are linear in the state derivatives and the new
+        # output variables. The essential equations of motion will be augmented
+        # with these equations and the outputs y will be solved for along with
+        # the inversion of the mass matrix.
+        # [Md  0  ] [u'] = [Fd]
+        # [Myu Myy] [y ]   [Fy]
+        # 2. Equations that are simply a function of the state:
+        # [y1] = [f1(t, x, r, p)]
+        # [y2]   [f2(t, x, r, p)]
+        # [y3]   [f3(t, x, r, p)]
+        #
+        # The end goal is to have something like:
+        # def rhs(t, x, r, p):
+        #     M, F, Y1 = eval_eqs(t, x, r, p)
+        #     sol = solve(M, F)
+        #     xdot = sol[:len(x)]
+        #     Y2 = sol[len(x):]
+        #     Y3 = eval_eqs2(t, x, xdot, r, p)
+        #     return xdot, vstack((Y1, Y2, Y3))
+
+        funcs_of_x = []
+        solved_eq_names = []
+
+        funcs_of_xdot = []
+        linear_eq_names = []
+
+        for var, expr in self.outputs:
+            if isinstance(var, sm.UndefinedFunction):
+                if expr.has(self.speeds.diff()):
+                    funcs_of_xdot.append(expr)
+                    linear_eq_names.append(var)
+                else:
+                    funcs_of_x.append(expr)
+                    solved_eq_names.append(var)
+            else:
+                for v, e in zip(var, expr):
+                    if expr.has(self.speeds.diff()):
+                        funcs_of_xdot.append(e)
+                        linear_eq_names.append(v)
+                    else:
+                        funcs_of_x.append(e)
+                        solved_eq_names.append(v)
+
+        funcs_of_xdot = sm.Matrix(funcs_of_xdot)
+        xd = [ui.diff() for ui in self.speeds] + linear_eq_names
+        mass_matrix_rows = funcs_of_xdot.jacobian(xd)
+        forcing_rows = -funcs_of_xdot.xreplace({xdi: 0 for xdi in xd})
+
+        return mass_matrix_rows, forcing_rows
 
     @property
     def constraint_loads(self):
