@@ -115,7 +115,7 @@ def test_outputs():
     p_vals = np.array([1.0, 2.0, 3.0, 4.0, 10.0, 9.81])
 
     qdot_exp = list(x_vals[2:4])
-    udot_exp = np.array(mass_matrix.cramer_solve(forcing).xreplace(
+    udot_exp = np.array(mass_matrix.LUsolve(forcing).xreplace(
         dict(zip(x, x_vals))).xreplace((dict(zip(p, p_vals)))).evalf()[:],
         dtype=float)
     y_exp = np.array(sm.Matrix((p1_x, p1_y, p2_x, p2_y, kinetic_energy,
@@ -534,6 +534,11 @@ class TestODEFunctionGenerator(object):
                                               self.sys.coordinates,
                                               self.sys.speeds,
                                               self.sys.constants_symbols)
+        self.outputs = sm.Matrix([
+            b.kinetic_energy(self.sys.eom_method._inertial)
+            for b in self.sys.eom_method.bodies
+        ])
+
 
     def test_init_full_rhs(self):
 
@@ -577,6 +582,16 @@ class TestODEFunctionGenerator(object):
         assert g.num_speeds == 2
         assert g.num_states == 4
         assert g.system_type == 'min mass matrix'
+
+    def test_init_outputs(self):
+
+        g = ODEFunctionGenerator(self.rhs,
+                                 self.sys.coordinates,
+                                 self.sys.speeds,
+                                 self.sys.constants_symbols,
+                                 outputs=self.outputs)
+
+        assert g.num_outputs == 2
 
     def test_set_linear_system_solver(self):
 
@@ -666,8 +681,12 @@ class TestODEFunctionGeneratorSubclasses(object):
         # Best keep these in order, otherwise it may change between SymPy
         # versions.
         self.constants = list(sm.ordered(self.sys.constants_symbols))
+        self.outputs = sm.Matrix([
+            b.kinetic_energy(self.sys.eom_method._inertial)
+            for b in self.sys.eom_method.bodies
+        ])
 
-    def eval_rhs(self, rhs):
+    def eval_rhs(self, rhs, with_outputs=False):
 
         # In order:
         c0 = 1.0
@@ -677,9 +696,13 @@ class TestODEFunctionGeneratorSubclasses(object):
         x0 = 1.0
         v0 = 2.0
 
-        xdot = rhs(np.array([x0, v0]), 0.0, np.array([c0, k0, m0]))
-
         expected_xdot = np.array([v0, (-c0 * v0 - k0 * x0) / m0])
+
+        if with_outputs:
+            xdot, y = rhs(np.array([x0, v0]), 0.0, np.array([c0, k0, m0]))
+            np.testing.assert_allclose(y, [m0*v0**2/2])
+        else:
+            xdot = rhs(np.array([x0, v0]), 0.0, np.array([c0, k0, m0]))
 
         np.testing.assert_allclose(xdot, expected_xdot)
 
@@ -794,6 +817,59 @@ class TestODEFunctionGeneratorSubclasses(object):
                 xdot = f(x, 0.0, r, p)
 
                 np.testing.assert_allclose(xdot, expected)
+
+    def test_generate_full_rhs_with_outputs(self):
+
+        rhs = self.sys.eom_method.rhs()
+
+        for Subclass in self.ode_function_subclasses:
+
+            g = Subclass(rhs,
+                         self.sys.coordinates,
+                         self.sys.speeds,
+                         self.constants,
+                         outputs=self.outputs)
+
+            rhs_func = g.generate()
+
+            self.eval_rhs(rhs_func, with_outputs=True)
+
+    def test_generate_full_mass_matrix_with_outputs(self):
+
+        for Subclass in self.ode_function_subclasses:
+
+            g = Subclass(self.sys.eom_method.forcing_full,
+                         self.sys.coordinates,
+                         self.sys.speeds,
+                         self.constants,
+                         mass_matrix=self.sys.eom_method.mass_matrix_full,
+                         outputs=self.outputs)
+
+            rhs_func = g.generate()
+
+            print(self.outputs)
+
+            self.eval_rhs(rhs_func, with_outputs=True)
+
+    def test_generate_min_mass_matrix_with_outputs(self):
+
+        kin_diff_eqs = self.sys.eom_method.kindiffdict()
+        coord_derivs = sm.Matrix([kin_diff_eqs[c.diff()] for c in
+                                  self.sys.coordinates])
+
+        for Subclass in self.ode_function_subclasses:
+
+            g = Subclass(self.sys.eom_method.forcing,
+                         self.sys.coordinates,
+                         self.sys.speeds,
+                         self.constants,
+                         mass_matrix=self.sys.eom_method.mass_matrix,
+                         coordinate_derivatives=coord_derivs,
+                         outputs=self.outputs)
+
+            rhs_func = g.generate()
+
+            self.eval_rhs(rhs_func, with_outputs=True)
 
     def test_rhs_args(self):
         # This test takes a while to run but it checks all the combinations.

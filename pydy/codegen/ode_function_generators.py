@@ -899,9 +899,21 @@ cse : boolean, optional, default True
         f = self._lambdify(outputs)
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: np.squeeze(f(q, u, p))
+            if self.outputs is None:
+                self.eval_arrays = lambda q, u, p: np.squeeze(f(q, u, p))
+            else:
+                def wrapper(q, u, p):
+                    xdot, y = f(q, u, p)
+                    return np.squeeze(xdot), np.squeeze(y)
+                self.eval_arrays = wrapper
         else:
-            self.eval_arrays = lambda q, u, r, p: np.squeeze(f(q, u, r, p))
+            if self.outputs is None:
+                self.eval_arrays = lambda q, u, r, p: np.squeeze(f(q, u, r, p))
+            else:
+                def wrapper(q, u, r, p):
+                    xdot, y = f(q, u, r, p)
+                    return np.squeeze(xdot), np.squeeze(y)
+                self.eval_arrays = wrapper
 
     def generate_full_mass_matrix_function(self):
 
@@ -1125,35 +1137,35 @@ cse : boolean, optional, default True
 
         f = self._symjitify(outputs)
 
-        m_dim = len(self.inputs[0]) + len(self.inputs[1])
+        n = self.num_states
 
         if self.specifieds is None:
             if self.outputs is None:
                 def wrapper(q, u, p):
                     all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
-                    m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                    f_vals = all_vals[m_dim*m_dim:]
+                    m_vals = all_vals[:n*n].reshape(n, n)
+                    f_vals = all_vals[n*n:]
                     return m_vals, f_vals
             else:
                 def wrapper(q, u, p):
                     all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
-                    m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                    f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + self.num_states]
-                    y_vals = all_vals[-self.num_states:]
+                    m_vals = all_vals[:n*n].reshape(n, n)
+                    f_vals = all_vals[n*n:n*n + n]
+                    y_vals = all_vals[n*n + n:]
                     return m_vals, f_vals, y_vals
         else:
             if self.outputs is None:
                 def wrapper(q, u, r, p):
                     all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
-                    m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                    f_vals = all_vals[m_dim*m_dim:]
+                    m_vals = all_vals[:n*n].reshape(n, n)
+                    f_vals = all_vals[n*n:]
                     return m_vals, f_vals
             else:
                 def wrapper(q, u, r, p):
                     all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
-                    m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                    f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + self.num_states]
-                    y_vals = all_vals[-self.num_states:]
+                    m_vals = all_vals[:n*n].reshape(n, n)
+                    f_vals = all_vals[n*n:n*n + n]
+                    y_vals = all_vals[n*n + n:]
                     return m_vals, f_vals, y_vals
 
         self.eval_arrays = wrapper
