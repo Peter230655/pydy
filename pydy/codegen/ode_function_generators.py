@@ -550,7 +550,10 @@ y : ndarray, shape({num_outputs},)
                 if self.constants:
                     return self._base_rhs(q, u, *args[2:])
                 else:
-                    return self._base_rhs(q, u, *(args[2:3] + ([],)))
+                    if self.specifieds is None:
+                        return self._base_rhs(q, u, [])
+                    else:
+                        return self._base_rhs(q, u, *(args[2:3] + ([],)))
 
             rhs.__doc__ = self._generate_rhs_docstring()
 
