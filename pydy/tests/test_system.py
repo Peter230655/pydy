@@ -656,8 +656,6 @@ def test_system_with_constraints(plot=False):
     with pytest.raises(ValueError):  # times array not set
         xdot0 = sys.evaluate_ode()
 
-    # TODO : times has to be set before generating the ode function. Currenlty
-    # poor error message if not. Should sys.times default to array([0.0])?
     sys.times = np.array([1.0, 2.0])
 
     sys.set_dependent_initial_conditions()

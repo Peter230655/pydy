@@ -532,8 +532,8 @@ class System(object):
 
     @property
     def constraints(self):
-        """A columan matrix of configuration and motion constraints
-        expressions, ordered as stored in KanesMethod."""
+        """A column matrix of configuration and motion constraints expressions,
+        ordered as stored in KanesMethod."""
         constraints = sm.Matrix([])
 
         if self.config_constraints or self.motion_constraints:
@@ -551,35 +551,6 @@ class System(object):
     def num_constraints(self):
         """Total number of configuration and motion constaints."""
         return self.num_config_constraints + self.num_motion_constraints
-
-    def _generate_constraint_functions(self):
-        # TODO : Support explicit instance of time in the equations.
-
-        all_constraints = []
-
-        if self.eom_method._f_h:
-            self._eval_holonomic = sm.lambdify(
-                (self.states, self.constants_symbols),
-                self.eom_method._f_h, cse=True)
-            all_constraints += self.eom_method._f_h[:]
-
-        if self.eom_method._k_nh:
-            # rebuild the nonholonomic constraints
-            # TODO : KanesMethod and _Method should store the original
-            # constraints passed by the user. Fix in sympy.physics.mechanics.
-            nh = (self.eom_method._k_nh*self.eom_method.u +
-                  self.eom_method._f_nh)
-            self._eval_nonholonomic = sm.lambdify(
-                (self.states, self.constants_symbols),
-                nh, cse=True)
-            all_constraints += nh[:]
-
-        if all_constraints:
-            all_constraints = sm.Matrix(all_constraints)
-            self._eval_constraints = sm.lambdify(
-                (self.states, self.constants_symbols),
-                all_constraints, cse=True)
-            self._all_constraints = all_constraints
 
     def set_dependent_initial_conditions(self, dep_vars=None, use_jac=False,
                                          **root_kwargs):
@@ -735,9 +706,6 @@ class System(object):
         self._check_initial_conditions(self.initial_conditions)
         self._check_times(self.times)
 
-        if len(self.times) < 2:
-            raise ValueError('The times vector must be at least length 2.')
-
         if self.evaluate_ode_function is None:
             self.generate_ode_function()
 
@@ -803,9 +771,15 @@ class System(object):
 
         if t is None:
             if len(x.shape) == 1:
-                t = self.times[0]
+                if self.times:
+                    t = self.times[0]
+                else:
+                    t = np.zeros(x.shape[0])
             else:
-                t = self.times
+                if self.times:
+                    t = self.times
+                else:
+                    t = 0.0
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
@@ -870,9 +844,15 @@ class System(object):
 
         if t is None:
             if len(x.shape) == 1:
-                t = self.times[0]
+                if self.times:
+                    t = self.times[0]
+                else:
+                    t = np.zeros(x.shape[0])
             else:
-                t = self.times
+                if self.times:
+                    t = self.times
+                else:
+                    t = 0.0
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
@@ -982,13 +962,16 @@ class System(object):
 
         Returns
         -------
-        x_history : np.array, shape(num_integrator_time_steps, 2)
+        x_history : ndarray, shape(num_integrator_time_steps, 2)
             The trajectory of states (coordinates and speeds) through the
             requested time interval. num_integrator_time_steps is either
             len(times) if len(times) > 2, or is determined by the
             ``ode_solver``.
 
         """
+        if len(self.times) < 2:
+            raise ValueError('The times vector must be at least length 2.')
+
         x0, args = self._prep_for_evaluate()
 
         # NOTE : User cannot pass in args, System handles that.
