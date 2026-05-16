@@ -100,6 +100,7 @@ class System(object):
                  ode_solver=None, initial_conditions=None, times=None):
 
         self._eom_method = eom_method
+        self._extract_constraints()
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
@@ -470,7 +471,45 @@ class System(object):
             'specifieds': specifieds,
         }
 
+        if self.constraints:
+            kwargs['outputs'] = self.constraints
+
         return kwargs
+
+    def _extract_constraints(self):
+
+        if self.eom_method._f_h:
+            self.config_constraints = self.eom_method._f_h
+        else:
+            self.config_constraints = sm.Matrix([])
+
+        if self.eom_method._k_nh:
+            # rebuild the nonholonomic constraints
+            # TODO : KanesMethod and _Method should store the original
+            # constraints passed by the user. Fix in sympy.physics.mechanics.
+            self.motion_constraints = (
+                self.eom_method._k_nh*self.eom_method.u +
+                self.eom_method._f_nh)
+        else:
+            self.motion_constraints = sm.Matrix([])
+
+        self.num_config_constraints = len(self.config_constraints)
+        self.num_motion_constraints = len(self.motion_constraints)
+
+    @property
+    def constraints(self):
+        constraints = sm.Matrix([])
+
+        if self.config_constraints or self.motion_constraints:
+            if self.config_constraints:
+                constraints = self.config_constraints
+
+            if constraints and self.motion_constraints:
+                constraints = constraints.col_join(self.motion_constraints)
+            else:
+                constraints = self.motion_constraints
+
+        return constraints
 
     def _generate_constraint_functions(self):
         # TODO : Support explicit instance of time in the equations.
@@ -864,7 +903,10 @@ class System(object):
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
         elif len(x.shape) == 1 and isinstance(t, float):
-            return self.evaluate_ode_function(x, t, *args)
+            if self.constraints:
+                return self.evaluate_ode_function(x, t, *args)[0]
+            else:
+                return self.evaluate_ode_function(x, t, *args)
 
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
         # due to args not being necessarily being comprised of arrays.
@@ -873,7 +915,73 @@ class System(object):
                 raise ValueError('x trajectory must have same length as t.')
             xdot = np.zeros_like(x)
             for i, (ti, xi) in enumerate(zip(t, x)):
-                xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)
+                if self.constraints:
+                    xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)[0]
+                else:
+                    xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)
+            return xdot
+
+    def evaluate_con(self, x=None, t=None):
+        """Returns the right hand side of the differential equations. The
+        default is to evaluate at the set initial_conditions at the first time
+        value. Pass in optional arguments to override using the initial state
+        and time.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n), optional
+            State values at time t.
+        t : float or array_like, shape(m,), optional
+            Time or m time values.
+
+        Returns
+        =======
+        x_dot : ndarray, shape(n,) or shape(m, n)
+           Time derivative of the states at time t.
+
+        Notes
+        =====
+
+        This method is present for convenience, it is not designed to be used
+        where performance matters, use :py:meth:`System.evaluate_ode_function`
+        directly when performance is needed.
+
+        To see the order of the state values use::
+
+            >>> system = System(...)
+            >>> system.states
+
+        or::
+
+            >>> system.generate_ode_function()
+            >>> help(system.evaluate_ode_function)
+
+        """
+        x_default, args = self._prep_for_evaluate()
+
+        if x is None:
+            x = x_default
+        x = np.asarray(x)
+
+        if t is None:
+            if len(x.shape) == 1:
+                t = self.times[0]
+            else:
+                t = self.times
+
+        if len(x.shape) == 1 and not isinstance(t, float):
+            raise ValueError('Time must be a float.')
+        elif len(x.shape) == 1 and isinstance(t, float):
+            return self.evaluate_ode_function(x, t, *args)[1]
+
+        # NOTE : I tried to make use of numpy.vectorize but it is not possible
+        # due to args not being necessarily being comprised of arrays.
+        if len(x.shape) == 2:
+            if x.shape[0] != len(t):
+                raise ValueError('x trajectory must have same length as t.')
+            xdot = np.zeros_like(x)
+            for i, (ti, xi) in enumerate(zip(t, x)):
+                xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)[1]
             return xdot
 
 
@@ -907,8 +1015,13 @@ class System(object):
         # NOTE : User cannot pass in args, System handles that.
         solver_kwargs.pop('args', None)
 
+
+        def func(*args, **kwargs):
+            return self.evaluate_ode_function(*args, **kwargs)[0]
+
+
         x_history = self.ode_solver(
-            self.evaluate_ode_function,
+            func if self.constraints else self.evaluate_ode_function,
             x0,
             self.times,
             args=args, **solver_kwargs)

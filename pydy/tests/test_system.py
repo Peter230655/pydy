@@ -673,6 +673,8 @@ def test_system_with_constraints(plot=False):
 
     sys.times = np.array([1.0, 2.0])
 
+    np.testing.assert_allclose(sys.evaluate_con(), 0.0, atol=1e-12)
+
     xdot0 = sys.evaluate_ode()
     xdot0_expected = np.array([
         9.84807753,
@@ -775,3 +777,5 @@ def test_system_with_constraints(plot=False):
             ax.plot(sys.times, traj)
 
         plt.show()
+
+    return sys
