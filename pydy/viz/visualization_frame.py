@@ -83,7 +83,7 @@ class VisualizationFrame(object):
         >>> frame1 = VisualizationFrame('frame1', I, O, shape)
         >>> Ixx, Iyy, Izz, mass = symbols('Ixx Iyy Izz mass')
         >>> i = inertia(I, Ixx, Iyy, Izz)
-        >>> rbody = RigidBody('rbody', O, I, mass, (inertia, O))
+        >>> rbody = RigidBody('rbody', O, I, mass, (i, O))
         >>> # Initializing with a rigidbody ..
         >>> frame2 = VisualizationFrame('frame2', rbody, shape)
         >>> Pa = Particle('Pa', O, mass)

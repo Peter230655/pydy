@@ -278,12 +278,12 @@ class Box(Shape):
     'unnamed'
     >>> s.color
     'grey'
-    >>>s.width
-    5.0
-    >>>s.height
-    1.0
-    >>>s.depth
+    >>> s.width
     10.0
+    >>> s.height
+    5.0
+    >>> s.depth
+    1.0
     >>> s.name = 'my-shape1'
     >>> s.name
     'my-shape1'
@@ -322,7 +322,7 @@ class Cube(Shape):
     'unnamed'
     >>> s.color
     'grey'
-    >>>s.length
+    >>> s.length
     10.0
     >>> s.name = 'my-shape1'
     >>> s.name
@@ -333,7 +333,7 @@ class Cube(Shape):
     >>> s.length = 12.0
     >>> s.length
     12.0
-    >>> a = Cube('my-shape2', 'red', length=10)
+    >>> a = Cube(10.0, name='my-shape2', color='red')
     >>> a.name
     'my-shape2'
     >>> a.color
@@ -488,7 +488,7 @@ class Sphere(Shape):
     'unnamed'
     >>> s.color
     'grey'
-    >>>s.radius
+    >>> s.radius
     10.0
     >>> s.name = 'my-shape1'
     >>> s.name
@@ -536,7 +536,7 @@ class Circle(Sphere):
     'unnamed'
     >>> s.color
     'grey'
-    >>>s.radius
+    >>> s.radius
     10.0
     >>> s.name = 'my-shape1'
     >>> s.name
@@ -636,7 +636,7 @@ class Tetrahedron(Sphere):
     'unnamed'
     >>> s.color
     'grey'
-    >>>s.radius
+    >>> s.radius
     10.0
     >>> s.name = 'my-shape1'
     >>> s.name
@@ -678,7 +678,7 @@ class Octahedron(Sphere):
     'unnamed'
     >>> s.color
     'grey'
-    >>>s.radius
+    >>> s.radius
     10.0
     >>> s.name = 'my-shape1'
     >>> s.name
@@ -715,14 +715,13 @@ class Icosahedron(Sphere):
     ========
 
     >>> from pydy.viz.shapes import Icosahedron
-    >>> s = Icosahedron(10)
+    >>> s = Icosahedron(10.0)
     >>> s.name
     'unnamed'
     >>> s.color
     'grey'
-    >>>s.radius
+    >>> s.radius
     10.0
-    >>>#These can be changed later too ..
     >>> s.name = 'my-shape1'
     >>> s.name
     'my-shape1'
@@ -731,7 +730,7 @@ class Icosahedron(Sphere):
     'blue'
     >>> s.radius = 12.0
     >>> s.radius
-    12
+    12.0
     >>> a = Icosahedron(10.0, name='my-shape2', color='red')
     >>> a.name
     'my-shape2'
