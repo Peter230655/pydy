@@ -907,7 +907,7 @@ cse : boolean, optional, default True
             else:
                 def wrapper(q, u, p):
                     xdot, y = f(q, u, p)
-                    return np.squeeze(xdot), np.squeeze(y)
+                    return np.squeeze(xdot), np.atleast_1d(np.squeeze(y))
                 self.eval_arrays = wrapper
         else:
             if self.outputs is None:
@@ -915,7 +915,7 @@ cse : boolean, optional, default True
             else:
                 def wrapper(q, u, r, p):
                     xdot, y = f(q, u, r, p)
-                    return np.squeeze(xdot), np.squeeze(y)
+                    return np.squeeze(xdot), np.atleast_1d(np.squeeze(y))
                 self.eval_arrays = wrapper
 
     def generate_full_mass_matrix_function(self):
@@ -928,11 +928,11 @@ cse : boolean, optional, default True
         f = self._lambdify(outputs)
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: tuple([np.squeeze(o) for o in
-                                                      f(q, u, p)])
+            self.eval_arrays = lambda q, u, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, p)])
         else:
-            self.eval_arrays = lambda q, u, r, p: tuple([np.squeeze(o) for o
-                                                         in f(q, u, r, p)])
+            self.eval_arrays = lambda q, u, r, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, r, p)])
 
     def generate_min_mass_matrix_function(self):
 
@@ -945,11 +945,11 @@ cse : boolean, optional, default True
         f = self._lambdify(outputs)
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: tuple([np.squeeze(o) for o in
-                                                      f(q, u, p)])
+            self.eval_arrays = lambda q, u, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, p)])
         else:
-            self.eval_arrays = lambda q, u, r, p: tuple([np.squeeze(o) for o
-                                                         in f(q, u, r, p)])
+            self.eval_arrays = lambda q, u, r, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, r, p)])
 
 
 class TheanoODEFunctionGenerator(ODEFunctionGenerator):

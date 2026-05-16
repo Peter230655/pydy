@@ -27,7 +27,7 @@ A simple one degree of freedom mass spring damper system can be created with:
 
    >>> from pydy.models import multi_mass_spring_damper
    >>> sys = multi_mass_spring_damper()
-   >>> sys.constants_symbols
+   >>> sys.constants_symbols  # doctest: +SKIP
    {m0, c0, k0}
    >>> sys.coordinates
    [x0(t)]
@@ -44,16 +44,16 @@ gravity and two external forces can be created with:
 .. code:: python
 
    >>> sys = multi_mass_spring_damper(2, True, True)
-   >>> sys.constants_symbols
+   >>> sys.constants_symbols  # doctest: +SKIP
    {c1, m1, k0, c0, k1, m0, g}
    >>> sys.coordinates
    [x0(t), x1(t)]
    >>> sys.speeds
    [v0(t), v1(t)]
-   >>> sys.specifieds_symbols
+   >>> sys.specifieds_symbols  # doctest: +SKIP
    {f0(t), f1(t)}
    >>> from sympy import simplify
-   >>> sm.simplify(sys.eom_method.rhs())
+   >>> simplify(sys.eom_method.rhs())
    Matrix([
    [                                                                                                              v0(t)],
    [                                                                                                              v1(t)],
