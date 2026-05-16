@@ -407,11 +407,11 @@ class TestSystem():
 
     def test_evaluate_constraints(self):
         with pytest.raises(ValueError):
-            self.sys.evaluate_holonomic()
-        with pytest.raises(ValueError):
-            self.sys.evaluate_nonholonomic()
-        with pytest.raises(ValueError):
             self.sys.evaluate_constraints()
+        with pytest.raises(ValueError):
+            self.sys.evaluate_config_constraints()
+        with pytest.raises(ValueError):
+            self.sys.evaluate_motion_constraints()
 
     def test_integrate(self):
 
@@ -622,6 +622,10 @@ def test_system_with_constraints(plot=False):
 
     sys = System(kane)
 
+    assert sys.num_config_constraints == 1
+    assert sys.num_motion_constraints == 3
+    assert sys.num_constraints == 4
+
     sys.constants = {
         r: 0.3,
         g: 9.81,
@@ -649,6 +653,13 @@ def test_system_with_constraints(plot=False):
         u6: speed/sys.constants[r],
     }
 
+    with pytest.raises(ValueError):  # times array not set
+        xdot0 = sys.evaluate_ode()
+
+    # TODO : times has to be set before generating the ode function. Currenlty
+    # poor error message if not. Should sys.times default to array([0.0])?
+    sys.times = np.array([1.0, 2.0])
+
     sys.set_dependent_initial_conditions()
     x0 = sys.initial_conditions
     np.testing.assert_allclose(x0[x], 1.0)
@@ -664,16 +675,11 @@ def test_system_with_constraints(plot=False):
     np.testing.assert_allclose(x0[u5], np.deg2rad(100.0))
     np.testing.assert_allclose(x0[u6], speed/sys.constants[r])
 
-    np.testing.assert_allclose(sys.evaluate_holonomic(), 0.0, atol=1e-12)
-    np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-12)
+    np.testing.assert_allclose(sys.evaluate_config_constraints(), 0.0,
+                               atol=1e-12)
+    np.testing.assert_allclose(sys.evaluate_motion_constraints(), 0.0,
+                               atol=1e-12)
     np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-12)
-
-    with pytest.raises(ValueError):  # times array not set
-        xdot0 = sys.evaluate_ode()
-
-    sys.times = np.array([1.0, 2.0])
-
-    np.testing.assert_allclose(sys.evaluate_con(), 0.0, atol=1e-12)
 
     xdot0 = sys.evaluate_ode()
     xdot0_expected = np.array([
@@ -747,8 +753,10 @@ def test_system_with_constraints(plot=False):
     np.testing.assert_allclose(x0[u5], np.deg2rad(100.0))
     np.testing.assert_allclose(x0[u6], speed/sys.constants[r])
 
-    np.testing.assert_allclose(sys.evaluate_holonomic(), 0.0, atol=1e-10)
-    np.testing.assert_allclose(sys.evaluate_nonholonomic(), 0.0, atol=1e-10)
+    np.testing.assert_allclose(sys.evaluate_config_constraints(), 0.0,
+                               atol=1e-10)
+    np.testing.assert_allclose(sys.evaluate_motion_constraints(), 0.0,
+                               atol=1e-10)
     np.testing.assert_allclose(sys.evaluate_constraints(), 0.0, atol=1e-10)
 
     fps = 30  # frames per second
