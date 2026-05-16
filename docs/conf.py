@@ -190,7 +190,7 @@ intersphinx_mapping = {
     #'numpy': ('https://numpy.org/doc/stable/', None),
     #'py3js': ('https://pythreejs.readthedocs.io/en/stable', None),
     #'python': ('http://docs.python.org/', None),
-    #'scipy': ('https://docs.scipy.org/doc/scipy/', None),
+    'scipy': ('https://docs.scipy.org/doc/scipy/', None),
     'sympy': ('https://docs.sympy.org/latest/', None),
 }
 

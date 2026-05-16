@@ -367,15 +367,47 @@ class System(object):
 
     @property
     def ode_solver(self):
-        """A function that performs forward integration. It must have the
-        same signature as scipy.integrate.odeint, which is::
+        """A function that performs forward integration. It must have the same
+        signature as :py:func:`scipy.integrate.odeint`, which is::
 
-            x_history = ode_solver(f, x0, t, args=(args,))
+            x_history = ode_solver(f, x0, t, args=f_args)
 
-        where f is a function f(x, t, args), x0 are the initial conditions,
-        x_history is the state time history, x is the state, t is the time,
-        and args is a keyword argument takes arguments that are then passed
-        to f. The default solver is odeint.
+        where ``f`` is a function ``f(x, t, *f_args)``, ``x0`` are the initial
+        conditions, ``x_history`` is the state time history, ``x`` is the
+        state, ``t`` is the time, and ``args`` is a keyword argument takes
+        arguments that are then passed to ``f``. The default solver is
+        ``odeint``.
+
+        Examples
+        ========
+
+        SciPy introduced a unified :py:func:`scipy.integrate.solve_ivp` API
+        which can be used with PyDy. ``solve_ivp`` requires a function that has
+        swapped first arguments and it returns a solution object where the
+        trajectory is the transpose of what ``odeint`` outputs. You can make a
+        custom ODE solver function to use ``solve_ivp`` like so:
+
+        >>> from pydy.models import multi_mass_spring_damper
+        >>> sys = multi_mass_spring_damper()
+        >>> sys.initial_conditions[sys.coordinates[0]] = 1.0
+        >>> sys.times = [1.0, 2.0, 3.0]
+        >>> from scipy.integrate import solve_ivp
+        >>> def custom_ode_solver(f, x0, ts, args=(), **kwargs):
+        ...     return solve_ivp(lambda t, x: f(x, t, *args), ts[[0, -1]], x0,
+        ...                      t_eval=ts, **kwargs).y.T
+        >>> sys.ode_solver = custom_ode_solver
+
+        This then allows one to easiliy change methods and settings following
+        SciPy's API:
+
+        >>> sys.integrate(method='LSODA', rtol=1e-10)
+        array([[ 1.00000000e+00, -5.67952532e-17],
+               [ 6.59700039e-01, -5.33506568e-01],
+               [ 1.50574778e-01, -4.19279930e-01]])
+        >>> sys.integrate(method='RK23', rtol=1e-12)
+        array([[ 1.        ,  0.        ],
+               [ 0.65970115, -0.53350624],
+               [ 0.15057689, -0.41928088]])
 
         """
         return self._ode_solver
