@@ -771,15 +771,15 @@ class System(object):
 
         if t is None:
             if len(x.shape) == 1:
-                if self.times:
-                    t = self.times[0]
-                else:
+                if self.times.size == 0:
                     t = np.zeros(x.shape[0])
-            else:
-                if self.times:
-                    t = self.times
                 else:
+                    t = self.times[0]
+            else:
+                if self.times.size == 0:
                     t = 0.0
+                else:
+                    t = self.times
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
@@ -844,15 +844,15 @@ class System(object):
 
         if t is None:
             if len(x.shape) == 1:
-                if self.times:
-                    t = self.times[0]
-                else:
+                if self.times.size == 0:
                     t = np.zeros(x.shape[0])
-            else:
-                if self.times:
-                    t = self.times
                 else:
+                    t = self.times[0]
+            else:
+                if self.times.size == 0:
                     t = 0.0
+                else:
+                    t = self.times
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
