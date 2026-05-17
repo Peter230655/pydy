@@ -446,6 +446,25 @@ states in the form of a dict. The are the benchmark values used in
        alpha: 10.0,
     }
 
+Generate a time vector over which the integration will be carried out.
+
+.. jupyter-execute::
+
+    fps = 30  # frames per second
+    duration = 10.0  # seconds
+    sys.times = np.linspace(0.0, duration, num=int(duration*fps))
+
+The trajectory of the states over time can be found by calling the
+``.integrate()`` method. But due to the complexity of the equations of motion
+it is helpful to use the ``cython`` generator for faster numerical evaluation
+and the symbolic linear solver can also be set to maximize performance as well
+as avoid divide-by-zero issues.
+
+.. jupyter-execute::
+
+   _ = sys.generate_ode_function(generator='cython',
+                                 linear_sys_solver='sympy:CRAMER')
+
 Setup the initial conditions such that the bicycle is traveling at some forward
 speeds and has an initial positive roll rate.
 
@@ -489,25 +508,6 @@ Check if the initial conditions satisfy the constraints.
 .. jupyter-execute::
 
    np.isclose(sys.evaluate_constraints(), 0.0)
-
-Generate a time vector over which the integration will be carried out.
-
-.. jupyter-execute::
-
-    fps = 30  # frames per second
-    duration = 10.0  # seconds
-    sys.times = np.linspace(0.0, duration, num=int(duration*fps))
-
-The trajectory of the states over time can be found by calling the
-``.integrate()`` method. But due to the complexity of the equations of motion
-it is helpful to use the ``cython`` generator for faster numerical evaluation
-and the symbolic linear solver can also be set to maximize performance as well
-as avoid divide-by-zero issues.
-
-.. jupyter-execute::
-
-   _ = sys.generate_ode_function(generator='cython',
-                                 linear_sys_solver='sympy:CRAMER')
 
 Test that the initial condition gives a valid result.
 

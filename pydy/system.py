@@ -106,6 +106,7 @@ class System(object):
                  constraint_loads=None):
 
         self._eom_method = eom_method
+        self._extract_constraints()
 
         # NOTE: must be set before the state variables are intialized, so do
         # this first
@@ -386,15 +387,47 @@ class System(object):
 
     @property
     def ode_solver(self):
-        """A function that performs forward integration. It must have the
-        same signature as scipy.integrate.odeint, which is::
+        """A function that performs forward integration. It must have the same
+        signature as :py:func:`scipy.integrate.odeint`, which is::
 
-            x_history = ode_solver(f, x0, t, args=(args,))
+            x_history = ode_solver(f, x0, t, args=f_args)
 
-        where f is a function f(x, t, args), x0 are the initial conditions,
-        x_history is the state time history, x is the state, t is the time,
-        and args is a keyword argument takes arguments that are then passed
-        to f. The default solver is odeint.
+        where ``f`` is a function ``f(x, t, *f_args)``, ``x0`` are the initial
+        conditions, ``x_history`` is the state time history, ``x`` is the
+        state, ``t`` is the time, and ``args`` is a keyword argument takes
+        arguments that are then passed to ``f``. The default solver is
+        ``odeint``.
+
+        Examples
+        ========
+
+        SciPy introduced a unified :py:func:`scipy.integrate.solve_ivp` API
+        which can be used with PyDy. ``solve_ivp`` requires a function that has
+        swapped first arguments and it returns a solution object where the
+        trajectory is the transpose of what ``odeint`` outputs. You can make a
+        custom ODE solver function to use ``solve_ivp`` like so:
+
+        >>> from pydy.models import multi_mass_spring_damper
+        >>> sys = multi_mass_spring_damper()
+        >>> sys.initial_conditions[sys.coordinates[0]] = 1.0
+        >>> sys.times = [1.0, 2.0, 3.0]
+        >>> from scipy.integrate import solve_ivp
+        >>> def custom_ode_solver(f, x0, ts, args=(), **kwargs):
+        ...     return solve_ivp(lambda t, x: f(x, t, *args), ts[[0, -1]], x0,
+        ...                      t_eval=ts, **kwargs).y.T
+        >>> sys.ode_solver = custom_ode_solver
+
+        This then allows one to easiliy change methods and settings following
+        SciPy's API:
+
+        >>> sys.integrate(method='LSODA', rtol=1e-10)
+        array([[ 1.00000000e+00, -5.67952532e-17],
+               [ 6.59700039e-01, -5.33506568e-01],
+               [ 1.50574778e-01, -4.19279930e-01]])
+        >>> sys.integrate(method='RK23', rtol=1e-12)
+        array([[ 1.        ,  0.        ],
+               [ 0.65970115, -0.53350624],
+               [ 0.15057689, -0.41928088]])
 
         """
         return self._ode_solver
@@ -544,170 +577,54 @@ class System(object):
             'specifieds': specifieds,
         }
 
+        if self.constraints:
+            kwargs['outputs'] = self.constraints
+
         return kwargs
 
-    def _generate_constraint_functions(self):
-        # TODO : Support explicit instance of time in the equations.
-
-        all_constraints = []
+    def _extract_constraints(self):
+        """Extracts the configuration and motion constraints from the
+        eom_method and stores them in attributes."""
 
         if self.eom_method._f_h:
-            self._eval_holonomic = sm.lambdify(
-                (self.states, self.constants_symbols),
-                self.eom_method._f_h, cse=True)
-            all_constraints += self.eom_method._f_h[:]
+            self.config_constraints = self.eom_method._f_h
+        else:
+            self.config_constraints = sm.Matrix([])
 
         if self.eom_method._k_nh:
-            # rebuild the nonholonomic constraints
+            # rebuild the nonholonomic constraints from KanesMethod
             # TODO : KanesMethod and _Method should store the original
             # constraints passed by the user. Fix in sympy.physics.mechanics.
-            nh = (self.eom_method._k_nh*self.eom_method.u +
-                  self.eom_method._f_nh)
-            self._eval_nonholonomic = sm.lambdify(
-                (self.states, self.constants_symbols),
-                nh, cse=True)
-            all_constraints += nh[:]
-
-        if all_constraints:
-            all_constraints = sm.Matrix(all_constraints)
-            self._eval_constraints = sm.lambdify(
-                (self.states, self.constants_symbols),
-                all_constraints, cse=True)
-            self._all_constraints = all_constraints
-
-    def evaluate_holonomic(self, x=None):
-        """Returns the value of the holonomic constraints given the system
-        state.
-
-        Parameters
-        ==========
-        x : array_like, shape(n,) or shape(m, n), optional
-            State vector of n states or a series of m state vectors.
-
-        Returns
-        =======
-        ndarray, shape(o,) or shape(m, o)
-            Constraint vector of o constraints or a series of m constraint
-            vectors.
-
-        Notes
-        =====
-
-        To see the order of the state values use::
-
-            >>> system = System(...)
-            >>> system.states
-
-        or::
-
-            >>> system.generate_ode_function()
-            >>> help(system.evaluate_ode_function)
-
-        """
-        if not self.eom_method._f_h:
-            raise ValueError('This system has no holonomic constraints.')
-        if not hasattr(self, '_eval_holonomic'):
-            self._generate_constraint_functions()
-        if x is None:
-            x = self._initial_conditions_array
+            self.motion_constraints = (
+                self.eom_method._k_nh*self.eom_method.u +
+                self.eom_method._f_nh)
         else:
-            x = np.asarray(x)
-        p = self._constants_array
-        if len(x.shape) == 2:
-            x = x.T
-            return self._eval_holonomic(x, p).squeeze().T
-        else:
-            return self._eval_holonomic(x, p).squeeze()
+            self.motion_constraints = sm.Matrix([])
 
-    def evaluate_nonholonomic(self, x=None):
-        """Returns the value of the nonholonomic constraints given the system
-        state.
+        self.num_config_constraints = len(self.config_constraints)
+        self.num_motion_constraints = len(self.motion_constraints)
 
-        Parameters
-        ==========
-        x : array_like, shape(n,) or shape(m, n), optional
-            State vector of n states or a series of m state vectors.
+    @property
+    def constraints(self):
+        """A column matrix of configuration and motion constraints expressions,
+        ordered as stored in KanesMethod."""
+        constraints = sm.Matrix([])
 
-        Returns
-        =======
-        ndarray, shape(o,) or shape(m, o)
-            Constraint vector of o constraints or a series of m constraint
-            vectors.
+        if self.config_constraints or self.motion_constraints:
+            if self.config_constraints:
+                constraints = self.config_constraints
 
-        Notes
-        =====
+            if constraints and self.motion_constraints:
+                constraints = constraints.col_join(self.motion_constraints)
+            else:
+                constraints = self.motion_constraints
 
-        To see the order of the state values use::
+        return constraints
 
-            >>> system = System(...)
-            >>> system.states
-
-        or::
-
-            >>> system.generate_ode_function()
-            >>> help(system.evaluate_ode_function)
-
-        """
-        if not self.eom_method._k_nh:
-            msg = 'This system has no nonholonomic constraints.'
-            raise ValueError(msg)
-        if not hasattr(self, '_eval_nonholonomic'):
-            self._generate_constraint_functions()
-        if x is None:
-            x = self._initial_conditions_array
-        else:
-            x = np.asarray(x)
-        p = self._constants_array
-        if len(x.shape) == 2:
-            x = x.T
-            return self._eval_nonholonomic(x, p).squeeze().T
-        else:
-            return self._eval_nonholonomic(x, p).squeeze()
-
-    def evaluate_constraints(self, x=None):
-        """Returns the values of the holonomic and nonholonomic constraints at
-        the initial condition or, alternatively, for the provided state vector.
-
-        Parameters
-        ==========
-        x : array_like, shape(n,) or shape(m, n), optional
-            State vector of n states or a series of m state vectors.
-
-        Returns
-        =======
-        ndarray, shape(o,) or shape(m, o)
-            Constraint vector of o constraints or a series of m constraint
-            vectors.
-
-        Notes
-        =====
-
-        To see the order of the state values use::
-
-            >>> system = System(...)
-            >>> system.states
-
-        or::
-
-            >>> system.generate_ode_function()
-            >>> help(system.evaluate_ode_function)
-
-        """
-        if not self.eom_method._f_h and not self.eom_method._k_nh:
-            msg = 'This system does not have constraints.'
-            raise ValueError(msg)
-        if not hasattr(self, '_eval_constraints'):
-            self._generate_constraint_functions()
-        if x is None:
-            x = self._initial_conditions_array
-        else:
-            x = np.asarray(x)
-        p = self._constants_array
-        if len(x.shape) == 2:
-            x = x.T
-            return self._eval_constraints(x, p).squeeze().T
-        else:
-            return self._eval_constraints(x, p).squeeze()
+    @property
+    def num_constraints(self):
+        """Total number of configuration and motion constaints."""
+        return self.num_config_constraints + self.num_motion_constraints
 
     def set_dependent_initial_conditions(self, dep_vars=None, use_jac=False,
                                          **root_kwargs):
@@ -759,7 +676,7 @@ class System(object):
         dep_idxs = [self.states.index(xi) for xi in dep_vars]
 
         if use_jac:
-            jac = self._all_constraints.jacobian(dep_vars)
+            jac = self.constraints.jacobian(dep_vars)
             eval_jac = sm.lambdify((self.states, self.constants_symbols), jac,
                                    cse=True)
 
@@ -794,9 +711,9 @@ class System(object):
             self.initial_conditions[si] = vi
 
     def generate_ode_function(self, **kwargs):
-        """Calls ``pydy.codegen.ode_function_generators.generate_ode_function``
-        with the appropriate arguments, and sets the ``evaluate_ode_function``
-        attribute to the resulting function.
+        """Calls :py:func:`~generate_ode_function` with the appropriate
+        arguments, and sets the ``evaluate_ode_function`` attribute to the
+        resulting function.
 
         Parameters
         ----------
@@ -863,9 +780,6 @@ class System(object):
         self._check_initial_conditions(self.initial_conditions)
         self._check_times(self.times)
 
-        if len(self.times) < 2:
-            raise ValueError('The times vector must be at least length 2.')
-
         if self.evaluate_ode_function is None:
             self.generate_ode_function()
 
@@ -931,14 +845,23 @@ class System(object):
 
         if t is None:
             if len(x.shape) == 1:
-                t = self.times[0]
+                if self.times.size == 0:
+                    t = np.zeros(x.shape[0])
+                else:
+                    t = self.times[0]
             else:
-                t = self.times
+                if self.times.size == 0:
+                    t = 0.0
+                else:
+                    t = self.times
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
         elif len(x.shape) == 1 and isinstance(t, float):
-            return self.evaluate_ode_function(x, t, *args)
+            if self.constraints:
+                return self.evaluate_ode_function(x, t, *args)[0]
+            else:
+                return self.evaluate_ode_function(x, t, *args)
 
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
         # due to args not being necessarily being comprised of arrays.
@@ -947,9 +870,153 @@ class System(object):
                 raise ValueError('x trajectory must have same length as t.')
             xdot = np.zeros_like(x)
             for i, (ti, xi) in enumerate(zip(t, x)):
-                xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)
+                if self.constraints:
+                    xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)[0]
+                else:
+                    xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)
             return xdot
 
+    def evaluate_constraints(self, x=None, t=None):
+        """Returns the values of the configuration and motion constraints at
+        the initial condition or, alternatively, for the provided state vector.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n), optional
+            State vector of n states or a series of m state vectors.
+        t : float or array_like, shape(m,), optional
+            Time or m time values.
+
+        Returns
+        =======
+        ndarray, shape(o,) or shape(m, o)
+            Constraint vector of o constraints or a series of m constraint
+            vectors.
+
+        Notes
+        =====
+
+        To see the order of the state values use::
+
+            >>> system = System(...)
+            >>> system.states
+
+        or::
+
+            >>> system.generate_ode_function()
+            >>> help(system.evaluate_ode_function)
+
+        """
+        if self.num_constraints == 0:
+            raise ValueError('This system has no constraints.')
+        x_default, args = self._prep_for_evaluate()
+
+        if x is None:
+            x = x_default
+
+        x = np.asarray(x)
+
+        if t is None:
+            if len(x.shape) == 1:
+                if self.times.size == 0:
+                    t = np.zeros(x.shape[0])
+                else:
+                    t = self.times[0]
+            else:
+                if self.times.size == 0:
+                    t = 0.0
+                else:
+                    t = self.times
+
+        if len(x.shape) == 1 and not isinstance(t, float):
+            raise ValueError('Time must be a float.')
+        elif len(x.shape) == 1 and isinstance(t, float):
+            return self.evaluate_ode_function(x, t, *args)[1]
+
+        if len(x.shape) == 2:
+            if x.shape[0] != len(t):
+                raise ValueError('x trajectory must have same length as t.')
+            con = np.zeros((x.shape[0], self.num_constraints))
+            for i, (ti, xi) in enumerate(zip(t, x)):
+                con[i, :] = self.evaluate_ode_function(xi, ti, *args)[1]
+            return con
+
+    def evaluate_config_constraints(self, x=None, t=None):
+        """Returns the value of the configuration constraints given the system
+        state.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n), optional
+            State vector of n states or a series of m state vectors.
+        t : float or array_like, shape(m,), optional
+            Time or m time values.
+
+        Returns
+        =======
+        ndarray, shape(o,) or shape(m, o)
+            Constraint vector of o constraints or a series of m constraint
+            vectors.
+
+        Notes
+        =====
+
+        To see the order of the state values use::
+
+            >>> system = System(...)
+            >>> system.states
+
+        or::
+
+            >>> system.generate_ode_function()
+            >>> help(system.evaluate_ode_function)
+
+        """
+        if self.num_config_constraints == 0:
+            raise ValueError('This system has no configuration constraints.')
+        con = self.evaluate_constraints(x=x, t=t)
+        if len(con.shape) == 1:
+            return con[:self.num_config_constraints]
+        else:
+            return con[:, :self.num_config_constraints]
+
+    def evaluate_motion_constraints(self, x=None, t=None):
+        """Returns the value of the motion constraints given the system state.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n), optional
+            State vector of n states or a series of m state vectors.
+        t : float or array_like, shape(m,), optional
+            Time or m time values.
+
+        Returns
+        =======
+        ndarray, shape(o,) or shape(m, o)
+            Constraint vector of o constraints or a series of m constraint
+            vectors.
+
+        Notes
+        =====
+
+        To see the order of the state values use::
+
+            >>> system = System(...)
+            >>> system.states
+
+        or::
+
+            >>> system.generate_ode_function()
+            >>> help(system.evaluate_ode_function)
+
+        """
+        if self.num_motion_constraints == 0:
+            raise ValueError('This system has no motion constraints.')
+        con = self.evaluate_constraints(x=x, t=t)
+        if len(con.shape) == 1:
+            return con[self.num_config_constraints:]
+        else:
+            return con[:, self.num_config_constraints:]
 
     def integrate(self, **solver_kwargs):
         """Integrates the equations ``evaluate_ode_function()`` using
@@ -969,20 +1036,28 @@ class System(object):
 
         Returns
         -------
-        x_history : np.array, shape(num_integrator_time_steps, 2)
+        x_history : ndarray, shape(num_integrator_time_steps, 2)
             The trajectory of states (coordinates and speeds) through the
             requested time interval. num_integrator_time_steps is either
             len(times) if len(times) > 2, or is determined by the
             ``ode_solver``.
 
         """
+        if len(self.times) < 2:
+            raise ValueError('The times vector must be at least length 2.')
+
         x0, args = self._prep_for_evaluate()
 
         # NOTE : User cannot pass in args, System handles that.
         solver_kwargs.pop('args', None)
 
+
+        def func(*args, **kwargs):
+            return self.evaluate_ode_function(*args, **kwargs)[0]
+
+
         x_history = self.ode_solver(
-            self.evaluate_ode_function,
+            func if self.constraints else self.evaluate_ode_function,
             x0,
             self.times,
             args=args, **solver_kwargs)
