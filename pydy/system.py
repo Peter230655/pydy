@@ -369,8 +369,9 @@ class System(object):
 
     @times.setter
     def times(self, new_times):
+        times = np.asarray(new_times)
+        self._check_times(times)
         self._times = np.asarray(new_times)
-        self._check_times(self._times)
 
     def _check_times(self, times):
 
