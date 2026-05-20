@@ -116,7 +116,7 @@ class System(object):
             self.constraint_loads = constraint_loads
 
         if outputs is None:
-            self._outputs = dict()
+            self.outputs = dict()
         else:
             self.outputs = outputs
 
