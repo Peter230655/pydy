@@ -116,10 +116,9 @@ class System(object):
             self.constraint_loads = constraint_loads
 
         if outputs is None:
-            self._outputs = []
+            self._outputs = dict()
         else:
             self.outputs = outputs
-            self._parse_outputs()
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
@@ -486,6 +485,7 @@ class System(object):
     @outputs.setter
     def outputs(self, outputs):
         self._outputs = outputs
+        self._parse_outputs()
 
     def _parse_outputs(self):
         # Divide the equations into three types:
@@ -555,30 +555,33 @@ class System(object):
                     funcs_of_x.append(expr)
                     solved_eq_names.append(var)
 
-        if linear_eq_names:
-            self._augment = True
+        self._num_simple_outputs = len(solved_eq_names)
+        self._simple_outputs_symbols = solved_eq_names
+        if funcs_of_x:
+            self._simple_outputs_matrix = sm.Matrix(funcs_of_x)
+        else:
+            self._simple_outputs_matrix = funcs_of_x
 
-        funcs_of_xdot = sm.Matrix(funcs_of_xdot)
-        xd = [ui.diff() for ui in self.speeds] + linear_eq_names
-        # TOOD : linear_eq_to_matrix is ideal here but doesn't function in
-        # oldest support sympy.
-        mass_matrix_rows = funcs_of_xdot.jacobian(xd)
-        forcing_rows = -funcs_of_xdot.xreplace({xdi: 0 for xdi in xd})
+        if funcs_of_xdot:
+            funcs_of_xdot = sm.Matrix(funcs_of_xdot)
+            xd = [ui.diff() for ui in self.speeds] + linear_eq_names
+            # TOOD : linear_eq_to_matrix is ideal here but doesn't function in
+            # oldest support sympy.
+            mass_matrix_rows = funcs_of_xdot.jacobian(xd)
+            forcing_rows = -funcs_of_xdot.xreplace({xdi: 0 for xdi in xd})
+        else:
+            mass_matrix_rows = sm.Matrix([])
+            forcing_rows = sm.Matrix([])
 
         self.dummy_states = [sm.Symbol('∫ ' + s.name + ' dt') for s in
                              linear_eq_names]
-
-        self.outputs_symbols = output_names_in_order
-        self.num_outputs = len(output_names_in_order)
-
-        self._num_simple_outputs = len(solved_eq_names)
-        self._simple_outputs_symbols = solved_eq_names
-        self._simple_outputs_matrix = funcs_of_x
-
         self._num_linear_outputs = len(linear_eq_names)
         self._linear_outputs_symbols = linear_eq_names
         self._linear_outputs_mass_matrix_rows = mass_matrix_rows
         self._linear_outputs_forcing_rows = forcing_rows
+
+        self.outputs_symbols = output_names_in_order
+        self.num_outputs = len(output_names_in_order)
 
     def _augment_dynamical_diff_eqs(self):
         # [Md  0] [u'] = [Fd]  <- dynamical differential equations

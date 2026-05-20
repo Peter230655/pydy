@@ -851,21 +851,37 @@ def test_system_with_noncontributing_forces(plot=False):
     T_, c_, K_, X1, X2 = me.dynamicsymbols('T, c, K, X1, X2')
     int_T1, int_T2 = sm.Symbol('∫ T1 dt'), sm.Symbol('∫ T2 dt')
 
-    sys = System(kane,
-        outputs={
-            T_: ke,
-            (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff() - 10,
-                                 6*X1 + 7*X2 + 8*u1.diff() + 9*u2.diff() - 11]),
-            c_: constraint,
-            (K_, c_): sm.Matrix([ke, constraint]),
-        }
-    )
+    outputs = {
+        T_: ke,
+        c_: constraint,
+    }
+
+    sys = System(kane, outputs=outputs)
+
+    assert sys.num_outputs == 2
+    assert sys._num_simple_outputs == 2
+    assert sys._num_linear_outputs == 0
+    assert sys._simple_outputs_symbols == [T_, c_]
+    assert sys._linear_outputs_symbols == []
+    assert sys.outputs_symbols == [T_, c_]
+
+    # Now change the outputs to a new dictionary and make sure things update.
+    outputs = {
+        T_: ke,
+        (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff() - 10,
+                             6*X1 + 7*X2 + 8*u1.diff() + 9*u2.diff() - 11]),
+        c_: constraint,
+        (K_, c_): sm.Matrix([ke, constraint]),
+    }
+
+    sys.outputs = outputs
 
     assert sys.num_outputs == 6
     assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c_]
     assert sys._num_simple_outputs == 4
     assert sys._num_linear_outputs == 2
-    assert sys._simple_outputs_matrix == [ke, constraint, ke, constraint]
+    assert sys._simple_outputs_matrix == sm.Matrix([ke, constraint, ke,
+                                                    constraint])
     assert sys._simple_outputs_symbols == [T_, c_, K_, c_]
     assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2, 3],
                                                               [8, 9, 6, 7]])
@@ -877,11 +893,17 @@ def test_system_with_noncontributing_forces(plot=False):
                                                     [8, 9, 6, 7]]))
     assert F == Fd.col_join(sm.Matrix([10, 11]))
 
+    # Now when constraint loads are added, System will check KanesMethod for
+    # any auxilliary equations for the noncontributing forces. These will be
+    # appended to the outputs automatically. You have to add the correct number
+    # of constraint load symbols and they have to be present in the auxiliary
+    # equations.
     with pytest.raises(ValueError):  # too many symbols
         sys.constraint_loads = (T1, T2, u1)
 
     sys.constraint_loads = (T1, T2)
 
+    assert sys.num_outputs == 8
     assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c_, T1, T2]
 
     sys.constants = {
@@ -905,8 +927,11 @@ def test_system_with_noncontributing_forces(plot=False):
     print(sys.evaluate_ode())
 
     x_traj = sys.integrate()
+    assert x_traj.shape == (400, 8)  # shouldn't include dummy states?
     xdot_traj = sys.evaluate_ode(x=x_traj)
+    assert x_traj.shape == (400, 8)  # shouldn't include dummy states?
     y_traj = sys.evaluate_outputs(x=x_traj)
+    assert x_traj.shape == (400, 8)
 
     if plot:
         import matplotlib.pyplot as plt
@@ -920,7 +945,8 @@ def test_system_with_noncontributing_forces(plot=False):
         fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
                                  layout='constrained')
         for ax, traj, s in zip(axes, xdot_traj.T,
-                               [xi.diff() for xi in sys.coordinates + sys.speeds] +
+                               [xi.diff() for xi in sys.coordinates +
+                                sys.speeds] +
                                sys._linear_outputs_symbols):
             ax.plot(sys.times, traj)
             ax.set_ylabel(sm.latex(s, mode='inline'))
@@ -930,6 +956,5 @@ def test_system_with_noncontributing_forces(plot=False):
         for ax, traj, s in zip(axes, y_traj.T, sys.outputs_symbols):
             ax.plot(sys.times, traj)
             ax.set_ylabel(sm.latex(s, mode='inline'))
-
 
         plt.show()
