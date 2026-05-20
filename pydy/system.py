@@ -108,17 +108,22 @@ class System(object):
         self._eom_method = eom_method
         self._extract_constraints()
 
+        if outputs is None:
+            outputs = dict()
+
+        if self.constraints:
+            self._con_syms = tuple(sm.Dummy('c' + str(i)) for i in
+                                   range(self.num_constraints))
+            outputs[self._con_syms] = self.constraints
+
+        self.outputs = outputs  # calls _parse_outputs
+
         # NOTE: must be set before the state variables are intialized, so do
         # this first
         if constraint_loads is None:
             self._constraint_loads = []
         else:
-            self.constraint_loads = constraint_loads
-
-        if outputs is None:
-            self.outputs = dict()
-        else:
-            self.outputs = outputs
+            self.constraint_loads = constraint_loads  # calls parse_outputs again
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
@@ -579,6 +584,10 @@ class System(object):
         self._linear_outputs_symbols = linear_eq_names
         self._linear_outputs_mass_matrix_rows = mass_matrix_rows
         self._linear_outputs_forcing_rows = forcing_rows
+
+        if self.constraints:
+            self._constraint_idxs = [self._simple_outputs_symbols.index(ci)
+                                     for ci in self._con_syms]
 
         self.outputs_symbols = output_names_in_order
         self.num_outputs = len(output_names_in_order)
@@ -1055,9 +1064,12 @@ class System(object):
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
         elif len(x.shape) == 1 and isinstance(t, float):
-            if self._augment:
+            if self._linear_outputs_symbols and self._simple_outputs_symbols:
                 xdot, y1 = self.evaluate_ode_function(x, t, *args)
                 return np.hstack((y1, xdot[-len(self.dummy_states):]))
+            elif self._linear_outputs_symbols and not self._simple_outputs_symbols:
+                xdot = self.evaluate_ode_function(x, t, *args)
+                return xdot[-len(self.dummy_states):]
             else:
                 return self.evaluate_ode_function(x, t, *args)[1]
 
@@ -1068,9 +1080,12 @@ class System(object):
                 raise ValueError('x trajectory must have same length as t.')
             y = np.zeros((len(t), self.num_outputs))
             for i, (ti, xi) in enumerate(zip(t, x)):
-                if self._linear_outputs_symbols:
+                if self._linear_outputs_symbols and self._simple_outputs_symbols:
                     xdot, y1 = self.evaluate_ode_function(xi, ti, *args)
                     y[i, :] = np.hstack((y1, xdot[-len(self.dummy_states):]))
+                elif self._linear_outputs_symbols and not self._simple_outputs_symbols:
+                    xdot = self.evaluate_ode_function(xi, ti, *args)
+                    y[i, :] = xdot[-len(self.dummy_states):]
                 else:
                     y[i, :] = self.evaluate_ode_function(xi, ti, *args)[1]
             return y
@@ -1130,14 +1145,16 @@ class System(object):
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
         elif len(x.shape) == 1 and isinstance(t, float):
-            return self.evaluate_ode_function(x, t, *args)[1]
+            y = self.evaluate_ode_function(x, t, *args)[1]
+            return y[self._constraint_idxs]
 
         if len(x.shape) == 2:
             if x.shape[0] != len(t):
                 raise ValueError('x trajectory must have same length as t.')
             con = np.zeros((x.shape[0], self.num_constraints))
             for i, (ti, xi) in enumerate(zip(t, x)):
-                con[i, :] = self.evaluate_ode_function(xi, ti, *args)[1]
+                y = self.evaluate_ode_function(xi, ti, *args)[1]
+                con[i, :] = y[self._constraint_idxs]
             return con
 
     def evaluate_config_constraints(self, x=None, t=None):
