@@ -119,6 +119,7 @@ class System(object):
             self._outputs = []
         else:
             self.outputs = outputs
+            self._parse_outputs()
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
@@ -179,8 +180,9 @@ class System(object):
         # TODO : Should I raise an error if there are auxlilary equations but
         # constraint loads are not set? Also what if you call .states before
         # setting the constraint_loads. Or initial_conditions before it?
-        if self.constraint_loads:
-            return self.coordinates + self.speeds + self.constraint_impulses
+        if self._linear_outputs_symbols:
+            speeds = self.speeds + self.dummy_states
+            return self.coordinates + speeds
         else:
             return self.coordinates + self.speeds
 
@@ -485,27 +487,48 @@ class System(object):
     def outputs(self, outputs):
         self._outputs = outputs
 
-    def _assemble_outputs(self):
+    def _parse_outputs(self):
         # Divide the equations into three types:
-        # 1. Equations that are linear in the state derivatives and the new
-        # output variables. The essential equations of motion will be augmented
-        # with these equations and the outputs y will be solved for along with
-        # the inversion of the mass matrix.
-        # [Md  0  ] [u'] = [Fd]
-        # [Myu Myy] [y ]   [Fy]
-        # 2. Equations that are simply a function of the state:
+        #
+        # 1. Equations that are simply a function of the state:
         # [y1] = [f1(t, x, r, p)]
         # [y2]   [f2(t, x, r, p)]
         # [y3]   [f3(t, x, r, p)]
         #
+        # 2. Equations that are linear in the state derivatives and the new
+        # output variables, for example noncontributing forces. The essential
+        # equations of motion will be augmented with these equations and the
+        # outputs y will be solved for along in the inversion of the new
+        # augmented mass matrix.
+        # [Md  0] [u'] = [Fd]
+        # [Mu My] [y ]   [Fy]
+        #
+        # TODO : How could we also support Lagrange multipliers?:
+        # [Md CT] [u'] = [Fd]
+        # [C  Ml] [l ]   [Fl]
+        #
+        # TODO : support x' later.
+        # 3. Equations that are nonlinear functions of the state and its state
+        # derivatives.
+        # [y1] = [f1(t, x', x, r, p)]
+        # [y2]   [f2(t, x', x, r, p)]
+        # [y3]   [f3(t, x', x, r, p)]
+        #
         # The end goal is to have something like:
+        #
         # def rhs(t, x, r, p):
         #     M, F, Y1 = eval_eqs(t, x, r, p)
         #     sol = solve(M, F)
         #     xdot = sol[:len(x)]
         #     Y2 = sol[len(x):]
         #     Y3 = eval_eqs2(t, x, xdot, r, p)
-        #     return xdot, vstack((Y1, Y2, Y3))
+        #     Y = put_in_order((Y1, Y2, Y3))
+        #     return xdot, Y
+        #
+        # We should retain the order of the outputs in the provided dictionary
+        # for Y.
+
+        output_names_in_order = []
 
         funcs_of_x = []
         solved_eq_names = []
@@ -513,29 +536,61 @@ class System(object):
         funcs_of_xdot = []
         linear_eq_names = []
 
-        for var, expr in self.outputs:
-            if isinstance(var, sm.UndefinedFunction):
-                if expr.has(self.speeds.diff()):
-                    funcs_of_xdot.append(expr)
-                    linear_eq_names.append(var)
-                else:
-                    funcs_of_x.append(expr)
-                    solved_eq_names.append(var)
-            else:
+        for var, expr in self.outputs.items():
+            if isinstance(var, tuple):
                 for v, e in zip(var, expr):
-                    if expr.has(self.speeds.diff()):
+                    output_names_in_order.append(v)
+                    if expr.has(sm.Derivative):
                         funcs_of_xdot.append(e)
                         linear_eq_names.append(v)
                     else:
                         funcs_of_x.append(e)
                         solved_eq_names.append(v)
+            else:
+                output_names_in_order.append(var)
+                if expr.has(sm.Derivative):
+                    funcs_of_xdot.append(expr)
+                    linear_eq_names.append(var)
+                else:
+                    funcs_of_x.append(expr)
+                    solved_eq_names.append(var)
+
+        if linear_eq_names:
+            self._augment = True
 
         funcs_of_xdot = sm.Matrix(funcs_of_xdot)
         xd = [ui.diff() for ui in self.speeds] + linear_eq_names
+        # TOOD : linear_eq_to_matrix is ideal here but doesn't function in
+        # oldest support sympy.
         mass_matrix_rows = funcs_of_xdot.jacobian(xd)
         forcing_rows = -funcs_of_xdot.xreplace({xdi: 0 for xdi in xd})
 
-        return mass_matrix_rows, forcing_rows
+        self.dummy_states = [sm.Symbol('∫ ' + s.name + ' dt') for s in
+                             linear_eq_names]
+
+        self.outputs_symbols = output_names_in_order
+        self.num_outputs = len(output_names_in_order)
+
+        self._num_simple_outputs = len(solved_eq_names)
+        self._simple_outputs_symbols = solved_eq_names
+        self._simple_outputs_matrix = funcs_of_x
+
+        self._num_linear_outputs = len(linear_eq_names)
+        self._linear_outputs_symbols = linear_eq_names
+        self._linear_outputs_mass_matrix_rows = mass_matrix_rows
+        self._linear_outputs_forcing_rows = forcing_rows
+
+    def _augment_dynamical_diff_eqs(self):
+        # [Md  0] [u'] = [Fd]  <- dynamical differential equations
+        # [Mu My] [y ]   [Fy]  <- extra outputs y that are linear in u'
+        Md = self.eom_method.mass_matrix
+        Fd = self.eom_method.forcing
+        MuMy = self._linear_outputs_mass_matrix_rows
+        Fy = self._linear_outputs_forcing_rows
+        Mz = sm.zeros(Md.shape[0], MuMy.shape[0])
+        M = Md.row_join(Mz).col_join(MuMy)
+        F = Fd.col_join(Fy)
+        return M, F
 
     @property
     def constraint_loads(self):
@@ -558,19 +613,10 @@ class System(object):
         # dj/dt = j' = constraint_load
         # create some dummy impulse states
         self._constraint_loads = list(constraint_loads)
-        self.constraint_impulses = dynamicsymbols(
-            ','.join(['j_{' + si.name + '}' for si in
-                        self.constraint_loads]))
-        # The auxiliary equations augment the dynamical differential equations
-        # like so:
-        # [Md  0] [u'] = [Fd]
-        # [Mu Mj] [j']   [Fa]
-        aux_eqs = self.eom_method.auxiliary_eqs
-        u = sm.Matrix(self.speeds)
-        lam = sm.Matrix(self.constraint_loads)
-        x = u.diff(dynamicsymbols._t).col_join(lam)
-        self._aux_mass_matrix = aux_eqs.jacobian(x)  # [Mu Mj]
-        self._aux_forcing = -aux_eqs.xreplace({fi: 0 for fi in x})  # [Fa]
+        if tuple(constraint_loads) in self.outputs:
+            raise ValueError('Constraint loads already present in outputs.')
+        self.outputs[tuple(constraint_loads)] = self.eom_method.auxiliary_eqs
+        self._parse_outputs()
 
     @property
     def evaluate_ode_function(self):
@@ -589,13 +635,15 @@ class System(object):
         ``pydy.codegen.ode_function_generators.generate_ode_function``.
 
         """
-        if self.constraint_loads:
+        self._parse_outputs()
+
+        if self._linear_outputs_symbols:
             Fd = self.eom_method.forcing
-            Fa = self._aux_forcing
+            Fa = self._linear_outputs_forcing_rows
             # [Md  0] [u'] = [Fd]
             # [Mu Mj] [j']   [Fa]
             forcing = Fd.col_join(Fa)
-            speeds = self.speeds + self.constraint_impulses
+            speeds = self.speeds + self.dummy_states
         else:
             forcing = self.eom_method.forcing
             speeds = self.speeds
@@ -627,10 +675,12 @@ class System(object):
         kin_diff_rhs = sm.Matrix([kin_diff_dict[q.diff()] for q in
                                   self.coordinates])
 
-        if self.constraint_loads:
+        self._parse_outputs()
+
+        if self._linear_outputs_symbols:
             Md = self.eom_method.mass_matrix
-            MuMj = self._aux_mass_matrix
-            Mz = sm.zeros(Md.shape[0], len(self.constraint_loads))
+            MuMj = self._linear_outputs_mass_matrix_rows
+            Mz = sm.zeros(Md.shape[0], MuMj.shape[0])
             # [Md  0] [u'] = [Fd]
             # [Mu Mj] [j']   [Fa]
             mass_matrix = Md.row_join(Mz).col_join(MuMj)
@@ -643,8 +693,8 @@ class System(object):
             'specifieds': specifieds,
         }
 
-        if self.constraints:
-            kwargs['outputs'] = self.constraints
+        if self._simple_outputs_symbols:
+            kwargs['outputs'] = self._simple_outputs_matrix
 
         return kwargs
 
@@ -936,11 +986,91 @@ class System(object):
                 raise ValueError('x trajectory must have same length as t.')
             xdot = np.zeros_like(x)
             for i, (ti, xi) in enumerate(zip(t, x)):
-                if self.constraints:
+                if self._simple_outputs_symbols:
                     xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)[0]
                 else:
                     xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)
             return xdot
+
+    def evaluate_outputs(self, x=None, t=None):
+        """Returns the right hand side of the differential equations. The
+        default is to evaluate at the set initial_conditions at the first time
+        value. Pass in optional arguments to override using the initial state
+        and time.
+
+        Parameters
+        ==========
+        x : array_like, shape(n,) or shape(m, n), optional
+            State values at time t.
+        t : float or array_like, shape(m,), optional
+            Time or m time values.
+
+        Returns
+        =======
+        y : ndarray, shape(o,) or shape(m, o)
+           Time derivative of the states at time t.
+
+        Notes
+        =====
+
+        This method is present for convenience, it is not designed to be used
+        where performance matters, use :py:meth:`System.evaluate_ode_function`
+        directly when performance is needed.
+
+        To see the order of the state values use::
+
+            >>> system = System(...)
+            >>> system.states
+
+        or::
+
+            >>> system.generate_ode_function()
+            >>> help(system.evaluate_ode_function)
+
+        """
+        if not self.outputs:
+            raise ValueError('This system has no outputs.')
+
+        x_default, args = self._prep_for_evaluate()
+
+        if x is None:
+            x = x_default
+        x = np.asarray(x)
+
+        if t is None:
+            if len(x.shape) == 1:
+                if self.times.size == 0:
+                    t = np.zeros(x.shape[0])
+                else:
+                    t = self.times[0]
+            else:
+                if self.times.size == 0:
+                    t = 0.0
+                else:
+                    t = self.times
+
+        if len(x.shape) == 1 and not isinstance(t, float):
+            raise ValueError('Time must be a float.')
+        elif len(x.shape) == 1 and isinstance(t, float):
+            if self._augment:
+                xdot, y1 = self.evaluate_ode_function(x, t, *args)
+                return np.hstack((y1, xdot[-len(self.dummy_states):]))
+            else:
+                return self.evaluate_ode_function(x, t, *args)[1]
+
+        # NOTE : I tried to make use of numpy.vectorize but it is not possible
+        # due to args not being necessarily being comprised of arrays.
+        if len(x.shape) == 2:
+            if x.shape[0] != len(t):
+                raise ValueError('x trajectory must have same length as t.')
+            y = np.zeros((len(t), self.num_outputs))
+            for i, (ti, xi) in enumerate(zip(t, x)):
+                if self._linear_outputs_symbols:
+                    xdot, y1 = self.evaluate_ode_function(xi, ti, *args)
+                    y[i, :] = np.hstack((y1, xdot[-len(self.dummy_states):]))
+                else:
+                    y[i, :] = self.evaluate_ode_function(xi, ti, *args)[1]
+            return y
 
     def evaluate_constraints(self, x=None, t=None):
         """Returns the values of the configuration and motion constraints at
@@ -1123,7 +1253,7 @@ class System(object):
 
 
         x_history = self.ode_solver(
-            func if self.constraints else self.evaluate_ode_function,
+            func if self._simple_outputs_symbols else self.evaluate_ode_function,
             x0,
             self.times,
             args=args, **solver_kwargs)

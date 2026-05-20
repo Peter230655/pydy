@@ -843,14 +843,46 @@ def test_system_with_noncontributing_forces(plot=False):
     Fd = kane.forcing
     forcing = Fd.col_join(Fa)
     xdot = mass_matrix.cramer_solve(forcing)
-    ke = m1/2*P1.vel(N).dot(P1.vel(N)) + m2/2*P2.vel(N).dot(P2.vel(N))
-    acc_func = xdot[0, 0]**2 + xdot[1, 0]**2
-    stress = xdot[1, 0]/l2**2
-    constraint = P2.pos_from(O) - sm.sin(2)
 
-    pause
+    ke = (m1/2*P1.vel(N).dot(P1.vel(N)) +
+          m2/2*P2.vel(N).dot(P2.vel(N))).xreplace({u3: 0, u4: 0})
+    constraint = P2.pos_from(O).dot(N.x) - sm.sin(2)
 
-    sys = System(kane)
+    T_, c_, K_, X1, X2 = me.dynamicsymbols('T, c, K, X1, X2')
+    int_T1, int_T2 = sm.Symbol('∫ T1 dt'), sm.Symbol('∫ T2 dt')
+
+    sys = System(kane,
+        outputs={
+            T_: ke,
+            (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff(),
+                                 6*X1 + 7*X2 + 8*u1.diff() + 9*u2.diff()]),
+            c_: constraint,
+            (K_, c_): sm.Matrix([ke, constraint]),
+        }
+    )
+
+    assert sys.num_outputs == 6
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c_]
+    assert sys._num_simple_outputs == 4
+    assert sys._num_linear_outputs == 2
+    assert sys._simple_outputs_matrix == [ke, constraint, ke, constraint]
+    assert sys._simple_outputs_symbols == [T_, c_, K_, c_]
+    #assert sys._linear_outputs_mass_matrix_rows == MuMj
+    #assert sys._linear_outputs_forcing_rows == Fa
+    assert sys._linear_outputs_symbols == [X1, X2]
+
+    M, F = sys._augment_dynamical_diff_eqs()
+    print(M, F)
+    #assert M == mass_matrix
+    #assert F == forcing
+
+
+    with pytest.raises(ValueError):  # too many symbols
+        sys.constraint_loads = (T1, T2, u1)
+
+    sys.constraint_loads = (T1, T2)
+
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c_, T1, T2]
 
     sys.constants = {
         m1: 1.0,
@@ -860,11 +892,6 @@ def test_system_with_noncontributing_forces(plot=False):
         c: 1.0,
         g: 9.81,
     }
-
-    with pytest.raises(ValueError):  # too many symbols
-        sys.constraint_loads = (T1, T2, u1)
-
-    sys.constraint_loads = (T1, T2)
 
     sys.initial_conditions = {
         q1: 0.1,
@@ -879,6 +906,7 @@ def test_system_with_noncontributing_forces(plot=False):
 
     x_traj = sys.integrate()
     xdot_traj = sys.evaluate_ode(x=x_traj)
+    y_traj = sys.evaluate_outputs(x=x_traj)
 
     if plot:
         import matplotlib.pyplot as plt
@@ -893,8 +921,15 @@ def test_system_with_noncontributing_forces(plot=False):
                                  layout='constrained')
         for ax, traj, s in zip(axes, xdot_traj.T,
                                [xi.diff() for xi in sys.coordinates + sys.speeds] +
-                               sys.constraint_loads):
+                               sys._linear_outputs_symbols):
             ax.plot(sys.times, traj)
             ax.set_ylabel(sm.latex(s, mode='inline'))
+
+        fig, axes = plt.subplots(sys.num_outputs, 1, sharex=True,
+                                 layout='constrained')
+        for ax, traj, s in zip(axes, y_traj.T, sys.outputs_symbols):
+            ax.plot(sys.times, traj)
+            ax.set_ylabel(sm.latex(s, mode='inline'))
+
 
         plt.show()
