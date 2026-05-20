@@ -854,8 +854,8 @@ def test_system_with_noncontributing_forces(plot=False):
     sys = System(kane,
         outputs={
             T_: ke,
-            (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff(),
-                                 6*X1 + 7*X2 + 8*u1.diff() + 9*u2.diff()]),
+            (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff() - 10,
+                                 6*X1 + 7*X2 + 8*u1.diff() + 9*u2.diff() - 11]),
             c_: constraint,
             (K_, c_): sm.Matrix([ke, constraint]),
         }
@@ -867,15 +867,15 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._num_linear_outputs == 2
     assert sys._simple_outputs_matrix == [ke, constraint, ke, constraint]
     assert sys._simple_outputs_symbols == [T_, c_, K_, c_]
-    #assert sys._linear_outputs_mass_matrix_rows == MuMj
-    #assert sys._linear_outputs_forcing_rows == Fa
+    assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2, 3],
+                                                              [8, 9, 6, 7]])
+    assert sys._linear_outputs_forcing_rows == sm.Matrix([10, 11])
     assert sys._linear_outputs_symbols == [X1, X2]
 
     M, F = sys._augment_dynamical_diff_eqs()
-    print(M, F)
-    #assert M == mass_matrix
-    #assert F == forcing
-
+    assert M == Md.row_join(Mz).col_join(sm.Matrix([[4, 5, 2, 3],
+                                                    [8, 9, 6, 7]]))
+    assert F == Fd.col_join(sm.Matrix([10, 11]))
 
     with pytest.raises(ValueError):  # too many symbols
         sys.constraint_loads = (T1, T2, u1)
