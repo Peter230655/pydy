@@ -995,12 +995,12 @@ class System(object):
         if t is None:
             if len(x.shape) == 1:
                 if self.times.size == 0:
-                    t = np.zeros(x.shape[0])
+                    t = 0.0
                 else:
                     t = self.times[0]
             else:
                 if self.times.size == 0:
-                    t = 0.0
+                    t = np.zeros(x.shape[0])
                 else:
                     t = self.times
 
@@ -1154,12 +1154,12 @@ class System(object):
         if t is None:
             if len(x.shape) == 1:
                 if self.times.size == 0:
-                    t = np.zeros(x.shape[0])
+                    t = 0.0
                 else:
                     t = self.times[0]
             else:
                 if self.times.size == 0:
-                    t = 0.0
+                    t = np.zeros(x.shape[0])
                 else:
                     t = self.times
 

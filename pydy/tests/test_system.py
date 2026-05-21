@@ -881,6 +881,16 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._linear_outputs_symbols == []
     assert sys.outputs_symbols == [T_, c_]
 
+    with pytest.raises(ValueError):
+        sys.evaluate_constraints()
+    with pytest.raises(ValueError):
+        sys.evaluate_config_constraints()
+    with pytest.raises(ValueError):
+        sys.evaluate_motion_constraints()
+    np.testing.assert_allclose(sys.evaluate_ode()[0],
+                               [0.0, 0.0, 0.0, 0.0])
+    np.testing.assert_allclose(sys.evaluate_ode()[1],
+                               [0.0, -0.9092974268256817])
     np.testing.assert_allclose(sys.evaluate_outputs(),
                                [0.0, -0.9092974268256817])
 
@@ -913,8 +923,6 @@ def test_system_with_noncontributing_forces(plot=False):
                                                     [8, 9, 6, 7]]))
     assert F == Fd.col_join(sm.Matrix([10, 11]))
 
-    # TODO : This fails because generate_ode_function() must be run after
-    # changing the outputs.
     np.testing.assert_allclose(sys.evaluate_outputs(),
         [0.0, -0.9092974268256817, 0.0, -0.9092974268256817, -9.25, 9.5])
 
@@ -945,10 +953,6 @@ def test_system_with_noncontributing_forces(plot=False):
         q2: 0.0,
     }
 
-    # TODO : Should not be required to manually generate a new ode function
-    # after updating the ouputs.
-    rhs = sys.generate_ode_function()
-    print(rhs.__doc__)
 
     np.testing.assert_allclose(sys.evaluate_outputs(),
         [0.0, -0.8094640101788535, 0.0, -0.8094640101788535, -9.26439137981748,
@@ -963,6 +967,9 @@ def test_system_with_noncontributing_forces(plot=False):
     assert x_traj.shape == (400, 8)  # shouldn't include dummy states?
     y_traj = sys.evaluate_outputs(x=x_traj)
     assert x_traj.shape == (400, 8)
+
+    rhs = sys.generate_ode_function()
+    print(rhs.__doc__)
 
     if plot:
         import matplotlib.pyplot as plt
