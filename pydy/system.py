@@ -169,6 +169,9 @@ class System(object):
 
         self._evaluate_ode_function = None
 
+        self._needs_regeneration = True
+        self._last_generate_ode_user_kwargs = {}
+
     @property
     def coordinates(self):
         """Returns a list of the symbolic functions of time representing the
@@ -504,6 +507,7 @@ class System(object):
     def outputs(self, outputs):
         self._outputs = outputs
         self._parse_outputs()
+        self._needs_regeneration = True
 
     def _parse_outputs(self):
         # Divide the equations into three types:
@@ -643,6 +647,7 @@ class System(object):
 
         self.outputs[tuple(constraint_loads)] = self.eom_method.auxiliary_eqs
         self._parse_outputs()
+        self._needs_regeneration = True
 
     @property
     def evaluate_ode_function(self):
@@ -879,7 +884,10 @@ class System(object):
         copying arrays.
 
         """
+        print('Generating ODE function, may take some time.')
         self._parse_outputs()  # call before generating the args/kwargs below
+
+        self._last_generate_ode_user_kwargs = kwargs.copy()
 
         if 'specified' in kwargs:
             kwargs.pop('specified')
@@ -920,8 +928,9 @@ class System(object):
         self._check_initial_conditions(self.initial_conditions)
         self._check_times(self.times)
 
-        if self.evaluate_ode_function is None:
-            self.generate_ode_function()
+        if self.evaluate_ode_function is None or self._needs_regeneration:
+            self.generate_ode_function(**self._last_generate_ode_user_kwargs)
+            self._needs_regeneration = False
 
         init_conds_dict = self._initial_conditions_padded_with_defaults()
         initial_conditions_in_proper_order = [

@@ -916,7 +916,7 @@ def test_system_with_noncontributing_forces(plot=False):
     # TODO : This fails because generate_ode_function() must be run after
     # changing the outputs.
     np.testing.assert_allclose(sys.evaluate_outputs(),
-                               [0.0, -0.9092974268256817, 0.0, 0.0, 0.0, 0.0])
+        [0.0, -0.9092974268256817, 0.0, -0.9092974268256817, -9.25, 9.5])
 
     # Now when constraint loads are added, System will check KanesMethod for
     # any auxilliary equations for the noncontributing forces. These will be
@@ -945,8 +945,14 @@ def test_system_with_noncontributing_forces(plot=False):
         q2: 0.0,
     }
 
+    # TODO : Should not be required to manually generate a new ode function
+    # after updating the ouputs.
     rhs = sys.generate_ode_function()
     print(rhs.__doc__)
+
+    np.testing.assert_allclose(sys.evaluate_outputs(),
+        [0.0, -0.8094640101788535, 0.0, -0.8094640101788535, -9.26439137981748,
+         10.96192493300433, 28.710670665299798, 19.044824599932618])
 
     sys.times = np.linspace(0.0, 4.0, num=400)
     print(sys.evaluate_ode())
