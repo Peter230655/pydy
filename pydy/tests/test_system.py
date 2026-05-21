@@ -786,14 +786,17 @@ def test_system_with_constraints(plot=False):
 
 
 def test_system_with_noncontributing_forces(plot=False):
-    # double simple pendulum with damping
-    m1, m2, l1, l2, c, g = sm.symbols('m1, m2, l1, l2, c, g')
-    q1, q2, u1, u2, T1, T2 = me.dynamicsymbols('q1, q2, u1, u2, T1, T2')
-    u3, u4 = me.dynamicsymbols('u3, u4')
 
-    N = me.ReferenceFrame('N')
-    A = me.ReferenceFrame('A')
-    B = me.ReferenceFrame('B')
+    # double simple pendulum with damping and noncontributing tension forces
+    # exposed
+    m1, m2, l1, l2, c, g = sm.symbols('m1, m2, l1, l2, c, g')
+    q1, q2, u1, u2 = me.dynamicsymbols('q1, q2, u1, u2')
+    u3, u4, T1, T2 = me.dynamicsymbols('u3, u4, T1, T2')
+
+    u = sm.Matrix([u1, u2])
+    lam = sm.Matrix([T1, T2])
+
+    N, A, B = sm.symbols('N, A, B', cls=me.ReferenceFrame)
 
     A.orient_axis(N, q1, N.z)
     B.orient_axis(N, q2, N.z)
@@ -831,30 +834,43 @@ def test_system_with_noncontributing_forces(plot=False):
     )
     kane.kanes_equations()
 
-    aux_eqs = kane.auxiliary_eqs
-    u = sm.Matrix([u1, u2])
-    lam = sm.Matrix([T1, T2])
+    # manually augment the equations of motion for the noncontributing forces
+    # [Md 0 ] [u'] = [Fd] => M x = F
+    # [Mu Ml] [l ]   [Fl]
     x = u.diff().col_join(lam)
-    MuMj = aux_eqs.jacobian(x)  # [Mu Mj]
-    Fa = -aux_eqs.xreplace({fi: 0 for fi in x})  # [Fa]
     Md = kane.mass_matrix
-    Mz = sm.zeros(Md.shape[0], 2)
-    mass_matrix = Md.row_join(Mz).col_join(MuMj)
     Fd = kane.forcing
-    forcing = Fd.col_join(Fa)
-    xdot = mass_matrix.cramer_solve(forcing)
+    Mz = sm.zeros(Md.shape[0], len(lam))
+    MuMl = kane.auxiliary_eqs.jacobian(x)
+    Fl = -kane.auxiliary_eqs.xreplace({fi: 0 for fi in x})
+    M_exp = Md.row_join(Mz).col_join(MuMl)
+    F_exp = Fd.col_join(Fl)
+    x_sol = M_exp.LUsolve(F_exp)
 
+    int_T1, int_T2 = sm.Symbol('∫ T1 dt'), sm.Symbol('∫ T2 dt')
+
+    # Check that the system will correctly build with automatic parsing of the
+    # auxiliary equations.
+    sys = System(kane, constraint_loads=(T1, T2))
+    M, F = sys._augment_dynamical_diff_eqs()
+
+    assert sys.num_outputs == 2
+    assert sys._num_simple_outputs == 0
+    assert sys._num_linear_outputs == 2
+    assert sys._simple_outputs_symbols == []
+    assert sys._linear_outputs_symbols == [T1, T2]
+    assert sys.outputs_symbols == [T1, T2]
+    assert M == M_exp
+    assert F == F_exp
+    np.testing.assert_allclose(sys.evaluate_outputs(), [2.0, 1.0])
+
+    # Check that the system will skip automatic parsing of the auxiliary
+    # equations and only handle additional simple outputs passed into __init__.
+    T_, c_ = me.dynamicsymbols('T, c')
     ke = (m1/2*P1.vel(N).dot(P1.vel(N)) +
           m2/2*P2.vel(N).dot(P2.vel(N))).xreplace({u3: 0, u4: 0})
     constraint = P2.pos_from(O).dot(N.x) - sm.sin(2)
-
-    T_, c_, K_, X1, X2 = me.dynamicsymbols('T, c, K, X1, X2')
-    int_T1, int_T2 = sm.Symbol('∫ T1 dt'), sm.Symbol('∫ T2 dt')
-
-    outputs = {
-        T_: ke,
-        c_: constraint,
-    }
+    outputs = {T_: ke, c_: constraint}
 
     sys = System(kane, outputs=outputs)
 
@@ -865,7 +881,11 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._linear_outputs_symbols == []
     assert sys.outputs_symbols == [T_, c_]
 
+    np.testing.assert_allclose(sys.evaluate_outputs(),
+                               [0.0, -0.9092974268256817])
+
     # Now change the outputs to a new dictionary and make sure things update.
+    K_, X1, X2 = me.dynamicsymbols('K, X1, X2')
     outputs = {
         T_: ke,
         (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff() - 10,
@@ -892,6 +912,11 @@ def test_system_with_noncontributing_forces(plot=False):
     assert M == Md.row_join(Mz).col_join(sm.Matrix([[4, 5, 2, 3],
                                                     [8, 9, 6, 7]]))
     assert F == Fd.col_join(sm.Matrix([10, 11]))
+
+    # TODO : This fails because generate_ode_function() must be run after
+    # changing the outputs.
+    np.testing.assert_allclose(sys.evaluate_outputs(),
+                               [0.0, -0.9092974268256817, 0.0, 0.0, 0.0, 0.0])
 
     # Now when constraint loads are added, System will check KanesMethod for
     # any auxilliary equations for the noncontributing forces. These will be

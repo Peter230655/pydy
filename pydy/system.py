@@ -1,5 +1,5 @@
 """The System class manages the simulation (integration) of a system whose
-equations are given by KanesMethod.
+equations are given by :py:class:`KanesMethod`.
 
 Many of the attributes are also properties, and can be directly modified.
 
@@ -99,6 +99,15 @@ class System(object):
         constraint forces from Lagrange multipliers, provide a list of variable
         names for these forces and they will be computed when evaluating the
         differential equations.
+    outputs : dictionary
+        Three possible entries for this dictionary:
+
+            1 .{Function('y')(t): SymPy Expression}
+            2. {(Function('y1')(t), Function('y2')(t): SymPy Column Matrix
+               where y1 and y2 are not present}
+            3. {(Function('f1')(t), Function('f2')(t): SymPy Column Matrix
+               where both expressions are linear f1, f2 and possilby the time
+               derivative of the speeds}
 
     """
     def __init__(self, eom_method, constants=None, specifieds=None,
@@ -181,9 +190,12 @@ class System(object):
         matrix and forcing vector.
 
         """
+        # requires settable attributes : outputs
+
         # TODO : Should I raise an error if there are auxlilary equations but
         # constraint loads are not set? Also what if you call .states before
         # setting the constraint_loads. Or initial_conditions before it?
+        # Should the dummy states even be output here? Or we hide them?
         if self._linear_outputs_symbols:
             speeds = self.speeds + self.dummy_states
             return self.coordinates + speeds
@@ -218,6 +230,7 @@ class System(object):
         """A set of the symbolic constants (not functions of time) in the
         system.
         """
+        # requires settable attributes : constants
         return self._constants_symbols
 
     def _check_constants(self, constants):
@@ -627,6 +640,7 @@ class System(object):
         self._constraint_loads = list(constraint_loads)
         if tuple(constraint_loads) in self.outputs:
             raise ValueError('Constraint loads already present in outputs.')
+
         self.outputs[tuple(constraint_loads)] = self.eom_method.auxiliary_eqs
         self._parse_outputs()
 
@@ -640,6 +654,8 @@ class System(object):
         This function is used by the ``ode_solver``.
 
         """
+        # TODO : It would be more useful if the generated docstring was shown
+        # when help(system.evaluate_ode_function) is called.
         return self._evaluate_ode_function
 
     def _args_for_gen_ode_func(self):
@@ -647,8 +663,6 @@ class System(object):
         ``pydy.codegen.ode_function_generators.generate_ode_function``.
 
         """
-        self._parse_outputs()
-
         if self._linear_outputs_symbols:
             Fd = self.eom_method.forcing
             Fa = self._linear_outputs_forcing_rows
@@ -672,7 +686,6 @@ class System(object):
         ``pydy.codegen.ode_function_generators.generage_ode_function``.
 
         """
-
         if self._specifieds_are_in_format_2(self.specifieds):
             specifieds = self.specifieds['symbols']
         else:
@@ -686,8 +699,6 @@ class System(object):
         kin_diff_dict = self.eom_method.kindiffdict()
         kin_diff_rhs = sm.Matrix([kin_diff_dict[q.diff()] for q in
                                   self.coordinates])
-
-        self._parse_outputs()
 
         if self._linear_outputs_symbols:
             Md = self.eom_method.mass_matrix
@@ -868,6 +879,7 @@ class System(object):
         copying arrays.
 
         """
+        self._parse_outputs()  # call before generating the args/kwargs below
 
         if 'specified' in kwargs:
             kwargs.pop('specified')
@@ -1052,12 +1064,12 @@ class System(object):
         if t is None:
             if len(x.shape) == 1:
                 if self.times.size == 0:
-                    t = np.zeros(x.shape[0])
+                    t = 0.0
                 else:
                     t = self.times[0]
             else:
                 if self.times.size == 0:
-                    t = 0.0
+                    t = np.zeros(x.shape[0])
                 else:
                     t = self.times
 
