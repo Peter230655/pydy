@@ -841,22 +841,22 @@ class System(object):
         # TODO : The nonholonomic constraints can be solved analytically, root
         # is only required for the coordinates.
 
-        if not self.eom_method._f_h and not self.eom_method._k_nh:
+        if self.num_constraints == 0:
             msg = ('This system does not have constraints, set all initial '
                    'conditions yourself.')
             raise ValueError(msg)
         else:
-            num_holo = len(self.eom_method._f_h)
-            num_nonh = self.eom_method._k_nh.shape[0]
+            num_holo = self.num_config_constraints
+            num_nonh = self.num_motion_constraints
 
-        # TODO : These should be publicly accessible on KanesMethod.
+        # TODO : These variables should be publicly accessible on KanesMethod.
         if dep_vars is None:
             dep_vars = self.eom_method._qdep[:] + self.eom_method._udep[:]
 
         # TODO : Would be nice to check if the dependent variables are present
         # in the constraints and that the right number of coordinates and
         # speeds are each supplied.
-        if len(dep_vars) != num_holo + num_nonh:
+        if len(dep_vars) != self.num_constraints:
             msg = (f'You must supply {num_holo} dependent coordinates and '
                    f'{num_nonh} dependent speeds.')
             raise ValueError(msg)
@@ -978,10 +978,6 @@ class System(object):
             self.generate_ode_function(**self._last_generated_ode_user_kwargs)
             self._needs_code_regeneration = False
 
-        init_conds_dict = self._initial_conditions_padded_with_defaults()
-        initial_conditions_in_proper_order = [
-            init_conds_dict[k] for k in self.states]
-
         if self._specifieds_are_in_format_2(self.specifieds):
             specified_value = self.specifieds['values']
         else:
@@ -994,7 +990,7 @@ class System(object):
         else:
             args = (specified_value, self._constants_padded_with_defaults())
 
-        return initial_conditions_in_proper_order, args
+        return self._initial_conditions_array, args
 
     def _prep_x_t_overrides(self, x, t):
         x_default, args = self._prep_for_evaluate()
@@ -1051,8 +1047,8 @@ class System(object):
 
         or::
 
-            >>> system.generate_ode_function()
-            >>> help(system.evaluate_ode_function)
+            >>> rhs = system.generate_ode_function()
+            >>> help(rhs)
 
         """
         x, t, args = self._prep_x_t_overrides(x, t)
@@ -1060,29 +1056,29 @@ class System(object):
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
         elif len(x.shape) == 1 and isinstance(t, float):
-            if self.constraints:
-                return self.evaluate_ode_function(x, t, *args)[0]
+            res = self.evaluate_ode_function(x, t, *args)
+            if self._simple_outputs_symbols:
+                return res[0]
             else:
-                return self.evaluate_ode_function(x, t, *args)
-
+                return res
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
         # due to args not being necessarily being comprised of arrays.
-        if len(x.shape) == 2:
+        elif len(x.shape) == 2:
             if x.shape[0] != len(t):
                 raise ValueError('x trajectory must have same length as t.')
             xdot = np.zeros_like(x)
             for i, (ti, xi) in enumerate(zip(t, x)):
+                res = self.evaluate_ode_function(xi, ti, *args)
                 if self._simple_outputs_symbols:
-                    xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)[0]
+                    xdot[i, :] = res[0]
                 else:
-                    xdot[i, :] = self.evaluate_ode_function(xi, ti, *args)
+                    xdot[i, :] = res
             return xdot
 
     def evaluate_outputs(self, x=None, t=None):
-        """Returns the right hand side of the differential equations. The
-        default is to evaluate at the set initial_conditions at the first time
-        value. Pass in optional arguments to override using the initial state
-        and time.
+        """Returns an array of the evaluated outputs. The default is to
+        evaluate at the initial conditions at the first time value. Pass in
+        optional arguments to override the state or time.
 
         Parameters
         ==========
@@ -1094,7 +1090,7 @@ class System(object):
         Returns
         =======
         y : ndarray, shape(o,) or shape(m, o)
-           Time derivative of the states at time t.
+           Output values at time t.
 
         Notes
         =====
@@ -1110,8 +1106,8 @@ class System(object):
 
         or::
 
-            >>> system.generate_ode_function()
-            >>> help(system.evaluate_ode_function)
+            >>> rhs = system.generate_ode_function()
+            >>> help(rhs)
 
         """
         if not self.outputs:
@@ -1123,29 +1119,31 @@ class System(object):
             raise ValueError('Time must be a float.')
         elif len(x.shape) == 1 and isinstance(t, float):
             if self._linear_outputs_symbols and self._simple_outputs_symbols:
-                Y = np.zeros(self.num_outputs)
+                y = np.zeros(self.num_outputs)
                 xdot, y1 = self.evaluate_ode_function(x, t, *args)
-                Y[self._simple_idxs] = y1
-                Y[self._linear_idxs] = xdot[-len(self.dummy_states):]
-                return Y
-            elif self._linear_outputs_symbols and not self._simple_outputs_symbols:
+                y[self._simple_idxs] = y1
+                y[self._linear_idxs] = xdot[-len(self.dummy_states):]
+                return y
+            elif (self._linear_outputs_symbols and not
+                  self._simple_outputs_symbols):
                 xdot = self.evaluate_ode_function(x, t, *args)
                 return xdot[-len(self.dummy_states):]
             else:
                 return self.evaluate_ode_function(x, t, *args)[1]
-
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
         # due to args not being necessarily being comprised of arrays.
-        if len(x.shape) == 2:
+        elif len(x.shape) == 2:
             if x.shape[0] != len(t):
                 raise ValueError('x trajectory must have same length as t.')
             y = np.zeros((len(t), self.num_outputs))
             for i, (ti, xi) in enumerate(zip(t, x)):
-                if self._linear_outputs_symbols and self._simple_outputs_symbols:
+                if (self._linear_outputs_symbols and
+                    self._simple_outputs_symbols):
                     xdot, y1 = self.evaluate_ode_function(xi, ti, *args)
                     y[i, self._simple_idxs] = y1
                     y[i, self._linear_idxs] = xdot[-len(self.dummy_states):]
-                elif self._linear_outputs_symbols and not self._simple_outputs_symbols:
+                elif (self._linear_outputs_symbols and not
+                      self._simple_outputs_symbols):
                     xdot = self.evaluate_ode_function(xi, ti, *args)
                     y[i, :] = xdot[-len(self.dummy_states):]
                 else:
@@ -1179,8 +1177,8 @@ class System(object):
 
         or::
 
-            >>> system.generate_ode_function()
-            >>> help(system.evaluate_ode_function)
+            >>> rhs = system.generate_ode_function()
+            >>> help(rhs)
 
         """
         if self.num_constraints == 0:
@@ -1193,8 +1191,7 @@ class System(object):
         elif len(x.shape) == 1 and isinstance(t, float):
             y = self.evaluate_ode_function(x, t, *args)[1]
             return y[self._constraint_idxs]
-
-        if len(x.shape) == 2:
+        elif len(x.shape) == 2:
             if x.shape[0] != len(t):
                 raise ValueError('x trajectory must have same length as t.')
             con = np.zeros((x.shape[0], self.num_constraints))
@@ -1204,8 +1201,8 @@ class System(object):
             return con
 
     def evaluate_config_constraints(self, x=None, t=None):
-        """Returns the value of the configuration constraints given the system
-        state.
+        """Returns the values of the configuration at the initial condition or,
+        alternatively, for the provided state vector.
 
         Parameters
         ==========
@@ -1230,8 +1227,8 @@ class System(object):
 
         or::
 
-            >>> system.generate_ode_function()
-            >>> help(system.evaluate_ode_function)
+            >>> rhs = system.generate_ode_function()
+            >>> help(rhs)
 
         """
         if self.num_config_constraints == 0:
@@ -1243,7 +1240,8 @@ class System(object):
             return con[:, :self.num_config_constraints]
 
     def evaluate_motion_constraints(self, x=None, t=None):
-        """Returns the value of the motion constraints given the system state.
+        """Returns the values of the motion at the initial condition or,
+        alternatively, for the provided state vector.
 
         Parameters
         ==========
@@ -1268,8 +1266,8 @@ class System(object):
 
         or::
 
-            >>> system.generate_ode_function()
-            >>> help(system.evaluate_ode_function)
+            >>> rhs = system.generate_ode_function()
+            >>> help(rhs)
 
         """
         if self.num_motion_constraints == 0:
@@ -1314,12 +1312,14 @@ class System(object):
         solver_kwargs.pop('args', None)
 
 
+        # NOTE : skip the outputs if present
         def func(*args, **kwargs):
             return self.evaluate_ode_function(*args, **kwargs)[0]
 
 
         x_history = self.ode_solver(
-            func if self._simple_outputs_symbols else self.evaluate_ode_function,
+            (func if self._simple_outputs_symbols else
+             self.evaluate_ode_function),
             x0,
             self.times,
             args=args, **solver_kwargs)

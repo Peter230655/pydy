@@ -886,10 +886,8 @@ def test_system_with_noncontributing_forces(plot=False):
         sys.evaluate_config_constraints()
     with pytest.raises(ValueError):
         sys.evaluate_motion_constraints()
-    np.testing.assert_allclose(sys.evaluate_ode()[0],
+    np.testing.assert_allclose(sys.evaluate_ode(),
                                [0.0, 0.0, 0.0, 0.0])
-    np.testing.assert_allclose(sys.evaluate_ode()[1],
-                               [0.0, -0.9092974268256817])
     np.testing.assert_allclose(sys.evaluate_outputs(),
                                [0.0, -0.9092974268256817])
 
