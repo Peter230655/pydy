@@ -198,7 +198,7 @@ class System(object):
         # requires settable attributes : outputs
 
         if self._linear_outputs_symbols:
-            speeds = self.speeds + self.dummy_states
+            speeds = self.speeds + self.auxiliary_states
             return self.coordinates + speeds
         else:
             return self.coordinates + self.speeds
@@ -617,7 +617,7 @@ class System(object):
                     simple_outputs_names.append(var)
 
         if len(set(output_names_in_order)) < len(output_names_in_order):
-            raise ValueError('Duplicate names found in outputs keys.')
+            raise ValueError('All outputs must have unique names.')
 
         self._num_simple_outputs = len(simple_outputs_names)
         self._simple_outputs_symbols = simple_outputs_names
@@ -637,8 +637,8 @@ class System(object):
             mass_matrix_rows = sm.Matrix([])
             forcing_rows = sm.Matrix([])
 
-        self.dummy_states = [sm.Symbol('∫ ' + s.name + ' dt') for s in
-                             linear_eq_names]
+        self.auxiliary_states = [sm.Symbol('∫ ' + s.name + ' dt') for s in
+                                 linear_eq_names]
         self._num_linear_outputs = len(linear_eq_names)
         self._linear_outputs_symbols = linear_eq_names
         self._linear_outputs_mass_matrix_rows = mass_matrix_rows
@@ -709,7 +709,7 @@ class System(object):
             # [Md  0] [u'] = [Fd]
             # [Mu Mj] [j']   [Fa]
             forcing = Fd.col_join(Fa)
-            speeds = self.speeds + self.dummy_states
+            speeds = self.speeds + self.auxiliary_states
         else:
             forcing = self.eom_method.forcing
             speeds = self.speeds
@@ -1078,7 +1078,7 @@ class System(object):
         Returns
         =======
         y : ndarray, shape(o,) or shape(m, o)
-           Output values at time t.
+           o output values at time t.
 
         Notes
         =====
@@ -1110,12 +1110,12 @@ class System(object):
                 y = np.zeros(self.num_outputs)
                 xdot, y1 = self.evaluate_ode_function(x, t, *args)
                 y[self._simple_idxs] = y1
-                y[self._linear_idxs] = xdot[-len(self.dummy_states):]
+                y[self._linear_idxs] = xdot[-len(self.auxiliary_states):]
                 return y
             elif (self._linear_outputs_symbols and not
                   self._simple_outputs_symbols):
                 xdot = self.evaluate_ode_function(x, t, *args)
-                return xdot[-len(self.dummy_states):]
+                return xdot[-len(self.auxiliary_states):]
             else:
                 return self.evaluate_ode_function(x, t, *args)[1]
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
@@ -1129,11 +1129,11 @@ class System(object):
                     self._simple_outputs_symbols):
                     xdot, y1 = self.evaluate_ode_function(xi, ti, *args)
                     y[i, self._simple_idxs] = y1
-                    y[i, self._linear_idxs] = xdot[-len(self.dummy_states):]
+                    y[i, self._linear_idxs] = xdot[-len(self.auxiliary_states):]
                 elif (self._linear_outputs_symbols and not
                       self._simple_outputs_symbols):
                     xdot = self.evaluate_ode_function(xi, ti, *args)
-                    y[i, :] = xdot[-len(self.dummy_states):]
+                    y[i, :] = xdot[-len(self.auxiliary_states):]
                 else:
                     y[i, :] = self.evaluate_ode_function(xi, ti, *args)[1]
             return y

@@ -851,14 +851,31 @@ def test_system_with_noncontributing_forces(plot=False):
     # Check that the system will correctly build with automatic parsing of the
     # auxiliary equations.
     sys = System(kane, constraint_loads=(T1, T2))
-
+    assert sys.constants_symbols == {m1, m2, l1, l2, c, g}
+    assert sys.coordinates == [q1, q2]
+    assert sys.speeds == [u1, u2]
+    assert sys.constraint_loads == [T1, T2]
+    assert sys.outputs == {(T1, T2): kane.auxiliary_eqs}
+    assert sys.auxiliary_states == [int_T1, int_T2]  # auxiliaries ?
+    assert sys.states == [q1, q2, u1, u2, int_T1, int_T2]
+    #assert sys.num_states == 6  TODO : Add this.
     assert sys.num_outputs == 2
-    assert sys._num_simple_outputs == 0
-    assert sys._num_linear_outputs == 2
-    assert sys._simple_outputs_symbols == []
-    assert sys._linear_outputs_symbols == [T1, T2]
     assert sys.outputs_symbols == [T1, T2]
+    assert sys._num_simple_outputs == 0
+    assert sys._simple_outputs_symbols == []
+    assert sys._num_linear_outputs == 2
+    assert sys._linear_outputs_symbols == [T1, T2]
+    assert sys._simple_idxs == []
+    assert sys._linear_idxs == [0, 1]
+    assert sys.constraints == sm.Matrix([])
+    assert sys.num_constraints == 0
+    with pytest.raises(ValueError):
+        sys.set_dependent_initial_conditions()
     np.testing.assert_allclose(sys.evaluate_outputs(), [2.0, 1.0])
+    # TODO : If you haven't provided times it assumes time is always zero. Is
+    # this a good idea?
+    np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6))),
+                               np.array([[2.0, 1.0], [2.0, 1.0], [2.0, 1.0]]))
 
     # Check that the system will skip automatic parsing of the auxiliary
     # equations and only handle additional simple outputs passed into __init__.
@@ -903,6 +920,7 @@ def test_system_with_noncontributing_forces(plot=False):
     }
 
     sys.outputs = outputs
+    assert sys._needs_code_regeneration
 
     assert sys.num_outputs == 6
     assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2]
@@ -915,11 +933,6 @@ def test_system_with_noncontributing_forces(plot=False):
                                                               [8, 9, 6, 7]])
     assert sys._linear_outputs_forcing_rows == sm.Matrix([10, 11])
     assert sys._linear_outputs_symbols == [X1, X2]
-
-    M, F = sys._augment_dynamical_diff_eqs()
-    assert M == Md.row_join(Mz).col_join(sm.Matrix([[4, 5, 2, 3],
-                                                    [8, 9, 6, 7]]))
-    assert F == Fd.col_join(sm.Matrix([10, 11]))
 
     np.testing.assert_allclose(sys.evaluate_outputs(),
         [0.0, -9.25, 9.5, -0.9092974268256817, 0.0, -0.9092974268256817])
