@@ -851,7 +851,6 @@ def test_system_with_noncontributing_forces(plot=False):
     # Check that the system will correctly build with automatic parsing of the
     # auxiliary equations.
     sys = System(kane, constraint_loads=(T1, T2))
-    M, F = sys._augment_dynamical_diff_eqs()
 
     assert sys.num_outputs == 2
     assert sys._num_simple_outputs == 0
@@ -859,8 +858,6 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._simple_outputs_symbols == []
     assert sys._linear_outputs_symbols == [T1, T2]
     assert sys.outputs_symbols == [T1, T2]
-    assert M == M_exp
-    assert F == F_exp
     np.testing.assert_allclose(sys.evaluate_outputs(), [2.0, 1.0])
 
     # Check that the system will skip automatic parsing of the auxiliary

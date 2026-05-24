@@ -592,7 +592,7 @@ class System(object):
         output_names_in_order = []
 
         funcs_of_x = []
-        solved_eq_names = []
+        simple_outputs_names = []
 
         funcs_of_xdot = []
         linear_eq_names = []
@@ -606,7 +606,7 @@ class System(object):
                         linear_eq_names.append(v)
                     else:
                         funcs_of_x.append(e)
-                        solved_eq_names.append(v)
+                        simple_outputs_names.append(v)
             else:
                 output_names_in_order.append(var)
                 if expr.has(sm.Derivative):
@@ -614,13 +614,13 @@ class System(object):
                     linear_eq_names.append(var)
                 else:
                     funcs_of_x.append(expr)
-                    solved_eq_names.append(var)
+                    simple_outputs_names.append(var)
 
         if len(set(output_names_in_order)) < len(output_names_in_order):
             raise ValueError('Duplicate names found in outputs keys.')
 
-        self._num_simple_outputs = len(solved_eq_names)
-        self._simple_outputs_symbols = solved_eq_names
+        self._num_simple_outputs = len(simple_outputs_names)
+        self._simple_outputs_symbols = simple_outputs_names
         if funcs_of_x:
             self._simple_outputs_matrix = sm.Matrix(funcs_of_x)
         else:
@@ -630,7 +630,7 @@ class System(object):
             funcs_of_xdot = sm.Matrix(funcs_of_xdot)
             xd = [ui.diff() for ui in self.speeds] + linear_eq_names
             # TOOD : linear_eq_to_matrix is ideal here but doesn't function in
-            # oldest support sympy.
+            # oldest supported SymPy, .jacobian() can be very slow.
             mass_matrix_rows = funcs_of_xdot.jacobian(xd)
             forcing_rows = -funcs_of_xdot.xreplace({xdi: 0 for xdi in xd})
         else:
@@ -652,21 +652,9 @@ class System(object):
         self.num_outputs = len(output_names_in_order)
 
         self._simple_idxs = [output_names_in_order.index(si)
-                             for si in solved_eq_names]
+                             for si in simple_outputs_names]
         self._linear_idxs = [output_names_in_order.index(si)
                              for si in linear_eq_names]
-
-    def _augment_dynamical_diff_eqs(self):
-        # [Md  0] [u'] = [Fd]  <- dynamical differential equations
-        # [Mu My] [y ]   [Fy]  <- extra outputs y that are linear in u'
-        Md = self.eom_method.mass_matrix
-        Fd = self.eom_method.forcing
-        MuMy = self._linear_outputs_mass_matrix_rows
-        Fy = self._linear_outputs_forcing_rows
-        Mz = sm.zeros(Md.shape[0], MuMy.shape[0])
-        M = Md.row_join(Mz).col_join(MuMy)
-        F = Fd.col_join(Fy)
-        return M, F
 
     @property
     def constraint_loads(self):
