@@ -653,8 +653,7 @@ def test_system_with_constraints(plot=False):
         u6: speed/sys.constants[r],
     }
 
-    with pytest.raises(ValueError):  # times array not set
-        xdot0 = sys.evaluate_ode()
+    xdot0 = sys.evaluate_ode()  # assumes t = 0.0
 
     sys.times = np.array([1.0, 2.0])
 
