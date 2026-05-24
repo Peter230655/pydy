@@ -894,25 +894,29 @@ def test_system_with_noncontributing_forces(plot=False):
     np.testing.assert_allclose(sys.evaluate_outputs(),
                                [0.0, -0.9092974268256817])
 
+    # cannot have duplicate output names
+    with pytest.raises(ValueError):
+        sys.outputs = {T_: ke, (T_, c_): (ke, constraint)}
+
     # Now change the outputs to a new dictionary and make sure things update.
-    K_, X1, X2 = me.dynamicsymbols('K, X1, X2')
+    K_, c2, X1, X2 = me.dynamicsymbols('K, c2, X1, X2')
     outputs = {
         T_: ke,
         (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff() - 10,
                              6*X1 + 7*X2 + 8*u1.diff() + 9*u2.diff() - 11]),
         c_: constraint,
-        (K_, c_): sm.Matrix([ke, constraint]),
+        (K_, c2): sm.Matrix([ke, constraint]),
     }
 
     sys.outputs = outputs
 
     assert sys.num_outputs == 6
-    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c_]
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2]
     assert sys._num_simple_outputs == 4
     assert sys._num_linear_outputs == 2
     assert sys._simple_outputs_matrix == sm.Matrix([ke, constraint, ke,
                                                     constraint])
-    assert sys._simple_outputs_symbols == [T_, c_, K_, c_]
+    assert sys._simple_outputs_symbols == [T_, c_, K_, c2]
     assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2, 3],
                                                               [8, 9, 6, 7]])
     assert sys._linear_outputs_forcing_rows == sm.Matrix([10, 11])
@@ -924,7 +928,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert F == Fd.col_join(sm.Matrix([10, 11]))
 
     np.testing.assert_allclose(sys.evaluate_outputs(),
-        [0.0, -0.9092974268256817, 0.0, -0.9092974268256817, -9.25, 9.5])
+        [0.0, -9.25, 9.5, -0.9092974268256817, 0.0, -0.9092974268256817])
 
     # Now when constraint loads are added, System will check KanesMethod for
     # any auxilliary equations for the noncontributing forces. These will be
@@ -937,7 +941,7 @@ def test_system_with_noncontributing_forces(plot=False):
     sys.constraint_loads = (T1, T2)
 
     assert sys.num_outputs == 8
-    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c_, T1, T2]
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2, T1, T2]
 
     sys.constants = {
         m1: 1.0,
@@ -955,8 +959,16 @@ def test_system_with_noncontributing_forces(plot=False):
 
 
     np.testing.assert_allclose(sys.evaluate_outputs(),
-        [0.0, -0.8094640101788535, 0.0, -0.8094640101788535, -9.26439137981748,
-         10.96192493300433, 28.710670665299798, 19.044824599932618])
+        [
+            0.0,
+            -9.26439137981748,
+            10.96192493300433,
+            -0.8094640101788535,
+            0.0,
+            -0.8094640101788535,
+            28.710670665299798,
+            19.044824599932618,
+        ])
 
     sys.times = np.linspace(0.0, 4.0, num=400)
     print(sys.evaluate_ode())

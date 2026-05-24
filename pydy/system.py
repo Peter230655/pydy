@@ -69,8 +69,10 @@ warnings.simplefilter('once', PyDyFutureWarning)
 
 
 class System(object):
-    """See the class's attributes for a description of the arguments to
-    this constructor.
+    """Multibody dynamics system for simulation and numerical evaluation.
+
+    See the class's attributes for a description of the arguments to this
+    constructor.
 
     The parameters to this constructor are all attributes of the System.
     Actually, they are properties. With the exception of ``eom_method``,
@@ -169,8 +171,8 @@ class System(object):
 
         self._evaluate_ode_function = None
 
-        self._needs_regeneration = True
-        self._last_generate_ode_user_kwargs = {}
+        self._needs_code_regeneration = True
+        self._last_generated_ode_user_kwargs = {}
 
     @property
     def coordinates(self):
@@ -195,10 +197,6 @@ class System(object):
         """
         # requires settable attributes : outputs
 
-        # TODO : Should I raise an error if there are auxlilary equations but
-        # constraint loads are not set? Also what if you call .states before
-        # setting the constraint_loads. Or initial_conditions before it?
-        # Should the dummy states even be output here? Or we hide them?
         if self._linear_outputs_symbols:
             speeds = self.speeds + self.dummy_states
             return self.coordinates + speeds
@@ -386,12 +384,9 @@ class System(object):
 
     @property
     def times(self):
-        """An array-like object, containing time values over which the
-        equations of motion are integrated, numerically.
-
-        The object should be in a format which the integration module to be
-        used can accept.
-        """
+        """A 1D ndarray of monotonic time values over which the equations of
+        motion are numerically integrated. Can be set with an array-like for a
+        shape(n,) array."""
         return self._times
 
     @times.setter
@@ -402,6 +397,7 @@ class System(object):
 
     def _check_times(self, times):
 
+        # TODO : this check can probably be removed.
         if len(times.shape) == 0:
             raise TypeError("Times supplied should be in an array_like format.")
 
@@ -501,13 +497,45 @@ class System(object):
 
     @property
     def outputs(self):
+        """Dictionary of functions of time or utple of functions of time mapped
+        to SymPy expressions or iterables of expressions that represent extra
+        functions of the state that should be evaluted alongside the ordinary
+        differential equations. Acceptable key pairs for this dictionary take
+        the following three forms:
+
+        A single function of time mapped to a function of the state::
+
+            outputs[p(t)] = k*x(t)
+
+        A tuple of functions of time mapped to to functions of the state::
+
+            outputs[(f1(t), f2(t))] = (k*x(t), c*v(t))
+
+        A tuple of functions of time mapped to a system of linear equations in
+        the functions and the time derivatives of the states::
+
+            outputs[(m1(t), m2(t))] = (m1(t) - 4*m2(t) + k*x(t).diff(t) + 2,
+                                       m1(t) + 3*m2(t) - theta.diff(t))
+
+        If equations of the last form are provided, this linear system will be
+        numerically solved alongside the ordinary differential equations.
+
+        Notes
+        =====
+
+        If your system has configuration or motion constraints, these will
+        automatically be added to the outputs dictionary. If your system has
+        noncontributing forces exposed and you provide names for those forces,
+        these will automatically be added to the outputs dictionary.
+
+        """
         return self._outputs
 
     @outputs.setter
     def outputs(self, outputs):
         self._outputs = outputs
         self._parse_outputs()
-        self._needs_regeneration = True
+        self._needs_code_regeneration = True
 
     def _parse_outputs(self):
         # Divide the equations into three types:
@@ -529,7 +557,7 @@ class System(object):
         # [Md CT] [u'] = [Fd]
         # [C  Ml] [l ]   [Fl]
         #
-        # TODO : support x' later.
+        # TODO : support nonlinear functions of x' later.
         # 3. Equations that are nonlinear functions of the state and its state
         # derivatives.
         # [y1] = [f1(t, x', x, r, p)]
@@ -549,6 +577,17 @@ class System(object):
         #
         # We should retain the order of the outputs in the provided dictionary
         # for Y.
+        #
+        # The dictionary is iterated and for all ouputs:
+        # Y = [y1, y2, y3, y4, y5, y6]
+        # it is separated into simple outputs:
+        # Y1 = [y1, y2, y3, y6]
+        # and linear outputs:
+        # Y2 = [y4, y5]
+        # so to reconstruct Y in the order of the dictionary we need to store
+        # the indices in Y so we can do:
+        # Y[simple_idxs] = Y1
+        # Y[linear_idxs] = Y2
 
         output_names_in_order = []
 
@@ -562,7 +601,7 @@ class System(object):
             if isinstance(var, tuple):
                 for v, e in zip(var, expr):
                     output_names_in_order.append(v)
-                    if expr.has(sm.Derivative):
+                    if e.has(sm.Derivative):
                         funcs_of_xdot.append(e)
                         linear_eq_names.append(v)
                     else:
@@ -576,6 +615,9 @@ class System(object):
                 else:
                     funcs_of_x.append(expr)
                     solved_eq_names.append(var)
+
+        if len(set(output_names_in_order)) < len(output_names_in_order):
+            raise ValueError('Duplicate names found in outputs keys.')
 
         self._num_simple_outputs = len(solved_eq_names)
         self._simple_outputs_symbols = solved_eq_names
@@ -608,6 +650,11 @@ class System(object):
 
         self.outputs_symbols = output_names_in_order
         self.num_outputs = len(output_names_in_order)
+
+        self._simple_idxs = [output_names_in_order.index(si)
+                             for si in solved_eq_names]
+        self._linear_idxs = [output_names_in_order.index(si)
+                             for si in linear_eq_names]
 
     def _augment_dynamical_diff_eqs(self):
         # [Md  0] [u'] = [Fd]  <- dynamical differential equations
@@ -647,7 +694,7 @@ class System(object):
 
         self.outputs[tuple(constraint_loads)] = self.eom_method.auxiliary_eqs
         self._parse_outputs()
-        self._needs_regeneration = True
+        self._needs_code_regeneration = True
 
     @property
     def evaluate_ode_function(self):
@@ -738,7 +785,7 @@ class System(object):
         if self.eom_method._k_nh:
             # rebuild the nonholonomic constraints from KanesMethod
             # TODO : KanesMethod and _Method should store the original
-            # constraints passed by the user. Fix in sympy.physics.mechanics.
+            # constraints passed by the user. Fix in sympy.physics.mechanics!
             self.motion_constraints = (
                 self.eom_method._k_nh*self.eom_method.u +
                 self.eom_method._f_nh)
@@ -884,10 +931,9 @@ class System(object):
         copying arrays.
 
         """
-        print('Generating ODE function, may take some time.')
         self._parse_outputs()  # call before generating the args/kwargs below
 
-        self._last_generate_ode_user_kwargs = kwargs.copy()
+        self._last_generated_ode_user_kwargs = kwargs.copy()
 
         if 'specified' in kwargs:
             kwargs.pop('specified')
@@ -928,9 +974,9 @@ class System(object):
         self._check_initial_conditions(self.initial_conditions)
         self._check_times(self.times)
 
-        if self.evaluate_ode_function is None or self._needs_regeneration:
-            self.generate_ode_function(**self._last_generate_ode_user_kwargs)
-            self._needs_regeneration = False
+        if self.evaluate_ode_function is None or self._needs_code_regeneration:
+            self.generate_ode_function(**self._last_generated_ode_user_kwargs)
+            self._needs_code_regeneration = False
 
         init_conds_dict = self._initial_conditions_padded_with_defaults()
         initial_conditions_in_proper_order = [
@@ -949,6 +995,29 @@ class System(object):
             args = (specified_value, self._constants_padded_with_defaults())
 
         return initial_conditions_in_proper_order, args
+
+    def _prep_x_t_overrides(self, x, t):
+        x_default, args = self._prep_for_evaluate()
+
+        if x is None:
+            x = x_default
+        x = np.asarray(x)
+
+        # TODO : Maybe the default value of .times shouldn't be empty. Think
+        # about this.
+        if t is None:
+            if len(x.shape) == 1:
+                if self.times.size == 0:
+                    t = 0.0
+                else:
+                    t = self.times[0]
+            else:
+                if self.times.size == 0:
+                    t = np.zeros(x.shape[0])
+                else:
+                    t = self.times
+
+        return x, t, args
 
     def evaluate_ode(self, x=None, t=None):
         """Returns the right hand side of the differential equations. The
@@ -986,23 +1055,7 @@ class System(object):
             >>> help(system.evaluate_ode_function)
 
         """
-        x_default, args = self._prep_for_evaluate()
-
-        if x is None:
-            x = x_default
-        x = np.asarray(x)
-
-        if t is None:
-            if len(x.shape) == 1:
-                if self.times.size == 0:
-                    t = 0.0
-                else:
-                    t = self.times[0]
-            else:
-                if self.times.size == 0:
-                    t = np.zeros(x.shape[0])
-                else:
-                    t = self.times
+        x, t, args = self._prep_x_t_overrides(x, t)
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
@@ -1064,30 +1117,17 @@ class System(object):
         if not self.outputs:
             raise ValueError('This system has no outputs.')
 
-        x_default, args = self._prep_for_evaluate()
-
-        if x is None:
-            x = x_default
-        x = np.asarray(x)
-
-        if t is None:
-            if len(x.shape) == 1:
-                if self.times.size == 0:
-                    t = 0.0
-                else:
-                    t = self.times[0]
-            else:
-                if self.times.size == 0:
-                    t = np.zeros(x.shape[0])
-                else:
-                    t = self.times
+        x, t, args = self._prep_x_t_overrides(x, t)
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
         elif len(x.shape) == 1 and isinstance(t, float):
             if self._linear_outputs_symbols and self._simple_outputs_symbols:
+                Y = np.zeros(self.num_outputs)
                 xdot, y1 = self.evaluate_ode_function(x, t, *args)
-                return np.hstack((y1, xdot[-len(self.dummy_states):]))
+                Y[self._simple_idxs] = y1
+                Y[self._linear_idxs] = xdot[-len(self.dummy_states):]
+                return Y
             elif self._linear_outputs_symbols and not self._simple_outputs_symbols:
                 xdot = self.evaluate_ode_function(x, t, *args)
                 return xdot[-len(self.dummy_states):]
@@ -1103,7 +1143,8 @@ class System(object):
             for i, (ti, xi) in enumerate(zip(t, x)):
                 if self._linear_outputs_symbols and self._simple_outputs_symbols:
                     xdot, y1 = self.evaluate_ode_function(xi, ti, *args)
-                    y[i, :] = np.hstack((y1, xdot[-len(self.dummy_states):]))
+                    y[i, self._simple_idxs] = y1
+                    y[i, self._linear_idxs] = xdot[-len(self.dummy_states):]
                 elif self._linear_outputs_symbols and not self._simple_outputs_symbols:
                     xdot = self.evaluate_ode_function(xi, ti, *args)
                     y[i, :] = xdot[-len(self.dummy_states):]
@@ -1144,24 +1185,8 @@ class System(object):
         """
         if self.num_constraints == 0:
             raise ValueError('This system has no constraints.')
-        x_default, args = self._prep_for_evaluate()
 
-        if x is None:
-            x = x_default
-
-        x = np.asarray(x)
-
-        if t is None:
-            if len(x.shape) == 1:
-                if self.times.size == 0:
-                    t = 0.0
-                else:
-                    t = self.times[0]
-            else:
-                if self.times.size == 0:
-                    t = np.zeros(x.shape[0])
-                else:
-                    t = self.times
+        x, t, args = self._prep_x_t_overrides(x, t)
 
         if len(x.shape) == 1 and not isinstance(t, float):
             raise ValueError('Time must be a float.')
