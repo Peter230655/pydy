@@ -169,8 +169,8 @@ class System(object):
             outputs = dict()
 
         if self.constraints:
-            self._con_syms = tuple(sm.Dummy('c' + str(i)) for i in
-                                   range(self.num_constraints))
+            self._con_syms = [sm.Dummy('c' + str(i)) for i in
+                              range(self.num_constraints)]
             outputs[self._con_syms] = self.constraints
 
         self.outputs = outputs  # calls _parse_outputs
@@ -178,10 +178,10 @@ class System(object):
         # NOTE: must be set before the state variables are intialized, so do
         # this first
         if noncontributing_symbols is None:
-            self._noncontributing_symbols = tuple()
+            self._noncontributing_symbols = []
         else:
             # calls parse_outputs again:
-            self.noncontributing_symbols = tuple(noncontributing_symbols)
+            self.noncontributing_symbols = list(noncontributing_symbols)
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : Make these tuples instead of sets.
@@ -759,6 +759,7 @@ class System(object):
         # equations and that they are not a coordinate, speed, or specified.
         # dj/dt = j' = constraint_load
         # create some dummy impulse states
+        # TODO : What is this check?
         self._noncontributing_symbols = list(noncontributing_symbols)
         if tuple(noncontributing_symbols) in self.outputs:
             raise ValueError('Constraint loads already present in outputs.')
