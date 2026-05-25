@@ -786,11 +786,16 @@ def test_system_with_constraints(plot=False):
 
 def test_system_with_noncontributing_forces(plot=False):
 
-    # double simple pendulum with damping and noncontributing tension forces
-    # exposed
+    ###########################################################################
+    # Define the symbolic dynamics: double simple pendulum with damping and
+    # noncontributing tension forces exposed, based on:
+    # https://moorepants.github.io/learn-multibody-dynamics/noncontributing.html
+    ###########################################################################
     m1, m2, l1, l2, c, g = sm.symbols('m1, m2, l1, l2, c, g')
     q1, q2, u1, u2 = me.dynamicsymbols('q1, q2, u1, u2')
     u3, u4, T1, T2 = me.dynamicsymbols('u3, u4, T1, T2')
+    # TODO : Should these be dynamicsymbols to be consistent?
+    int_T1, int_T2 = sm.Symbol('∫ T1 dt'), sm.Symbol('∫ T2 dt')
 
     u = sm.Matrix([u1, u2])
     lam = sm.Matrix([T1, T2])
@@ -844,31 +849,29 @@ def test_system_with_noncontributing_forces(plot=False):
     Fl = -kane.auxiliary_eqs.xreplace({fi: 0 for fi in x})
     M_exp = Md.row_join(Mz).col_join(MuMl)
     F_exp = Fd.col_join(Fl)
-    x_sol = M_exp.LUsolve(F_exp)
 
-    int_T1, int_T2 = sm.Symbol('∫ T1 dt'), sm.Symbol('∫ T2 dt')
-
+    ###########################################################################
     # Check that the system will correctly build with automatic parsing of the
     # auxiliary equations.
+    ###########################################################################
     sys = System(kane, constraint_loads=(T1, T2))
-    assert sys.constants_symbols == {m1, m2, l1, l2, c, g}
-    assert sys.coordinates == [q1, q2]
-    assert sys.speeds == [u1, u2]
-    assert sys.constraint_loads == [T1, T2]
-    assert sys.outputs == {(T1, T2): kane.auxiliary_eqs}
-    assert sys.auxiliary_states == [int_T1, int_T2]  # auxiliaries ?
-    assert sys.states == [q1, q2, u1, u2, int_T1, int_T2]
-    #assert sys.num_states == 6  TODO : Add this.
-    assert sys.num_outputs == 2
-    assert sys.outputs_symbols == [T1, T2]
-    assert sys._num_simple_outputs == 0
-    assert sys._simple_outputs_symbols == []
-    assert sys._num_linear_outputs == 2
-    assert sys._linear_outputs_symbols == [T1, T2]
-    assert sys._simple_idxs == []
     assert sys._linear_idxs == [0, 1]
+    assert sys._linear_outputs_symbols == [T1, T2]
+    assert sys._num_linear_outputs == 2
+    assert sys._num_simple_outputs == 0
+    assert sys._simple_idxs == []
+    assert sys._simple_outputs_symbols == []
+    assert sys.auxiliary_states == [int_T1, int_T2]  # auxiliaries ?
+    assert sys.constants_symbols == {m1, m2, l1, l2, c, g}
+    assert sys.constraint_loads == [T1, T2]
     assert sys.constraints == sm.Matrix([])
+    assert sys.coordinates == [q1, q2]
     assert sys.num_constraints == 0
+    assert sys.num_outputs == 2
+    assert sys.outputs == {(T1, T2): kane.auxiliary_eqs}
+    assert sys.outputs_symbols == [T1, T2]
+    assert sys.speeds == [u1, u2]
+    assert sys.states == [q1, q2, u1, u2, int_T1, int_T2]
     with pytest.raises(ValueError):
         sys.set_dependent_initial_conditions()
     np.testing.assert_allclose(sys.evaluate_outputs(), [2.0, 1.0])
@@ -877,23 +880,90 @@ def test_system_with_noncontributing_forces(plot=False):
     np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6))),
                                np.array([[2.0, 1.0], [2.0, 1.0], [2.0, 1.0]]))
 
-    # Check that the system will skip automatic parsing of the auxiliary
-    # equations and only handle additional simple outputs passed into __init__.
-    T_, c_ = me.dynamicsymbols('T, c')
+    ###########################################################################
+    # Check a system with both constraints and noncontributing forces
+    ###########################################################################
+    # TODO : If u3 and u4 are not replaced here, equations of motion contain
+    # derivatives of u3 and u4. Maybe KanesMethod should to this substitution
+    # internally.
+    T_ = me.dynamicsymbols('T')
     ke = (m1/2*P1.vel(N).dot(P1.vel(N)) +
           m2/2*P2.vel(N).dot(P2.vel(N))).xreplace({u3: 0, u4: 0})
+    mot_con = P2.vel(N).dot(B.x).xreplace({u3: 0, u4: 0})
+    kane_with_con = me.KanesMethod(
+        N,
+        (q1, q2),
+        (u1,),
+        kd_eqs=[q1.diff() - u1, q2.diff() - u2],
+        u_dependent=(u2,),
+        velocity_constraints=[mot_con],
+        bodies=(bob1, bob2),
+        forcelist=loads,
+        u_auxiliary=(u3, u4),
+    )
+    kane_with_con.kanes_equations()
+
+    sys = System(
+        kane_with_con,
+        constants={m1: 1.0, m2: 2.0, l1: 1.0, l2: 2.0, c: 1.0, g: 9.81},
+        initial_conditions={q1: 0.1, q2: -0.2, u1: 1.4},
+        constraint_loads=(T1, T2),
+        outputs={T_: ke},
+    )
+    sys.set_dependent_initial_conditions()
+
+    # TODO : Should the user have access to the dummy symbols for the
+    # constraint residuals other than in sys.output_symbols?
+    fn = sys._con_syms[0]
+    assert sys._linear_outputs_symbols == [T1, T2]
+    assert sys._num_linear_outputs == 2
+    assert sys._num_simple_outputs == 2
+    assert sys._simple_outputs_matrix == sm.Matrix([ke, mot_con])
+    assert sys._simple_outputs_symbols == [T_, fn]
+    assert sys.constraint_loads == [T1, T2]
+    assert sys.constraints == sm.Matrix([mot_con])
+    assert sys.num_config_constraints == 0
+    assert sys.num_constraints == 1
+    assert sys.num_motion_constraints == 1
+    assert sys.num_outputs == 4
+    assert sys.outputs_symbols == [T_, fn, T1, T2]
+
+    np.testing.assert_allclose(sys.evaluate_ode(),
+        [1.4, -0.6687355423879242, -10.857684528809608, 5.614318317403088,
+         30.235328069913542, 18.345324])
+
+    np.testing.assert_allclose(sys.evaluate_outputs(),
+        [1.151171,  0.0, 30.235328, 18.345324])
+
+    np.testing.assert_allclose(sys.evaluate_motion_constraints(), [0.0])
+    np.testing.assert_allclose(sys.evaluate_constraints(), [0.0])
+    with pytest.raises(ValueError):
+        sys.evaluate_config_constraints()
+
+    ###########################################################################
+    # Check that the system will skip automatic parsing of the auxiliary
+    # equations and only handle additional simple outputs passed into __init__.
+    ###########################################################################
+    c_ = me.dynamicsymbols('c')
     constraint = P2.pos_from(O).dot(N.x) - sm.sin(2)
     outputs = {T_: ke, c_: constraint}
 
     sys = System(kane, outputs=outputs)
 
-    assert sys.num_outputs == 2
-    assert sys._num_simple_outputs == 2
-    assert sys._num_linear_outputs == 0
-    assert sys._simple_outputs_symbols == [T_, c_]
+    assert sys._linear_idxs == []
     assert sys._linear_outputs_symbols == []
+    assert sys._num_linear_outputs == 0
+    assert sys._num_simple_outputs == 2
+    assert sys._simple_idxs == [0, 1]
+    assert sys._simple_outputs_symbols == [T_, c_]
+    assert sys.auxiliary_states == []
+    assert sys.constraint_loads == []
+    assert sys.constraints == sm.Matrix([])
+    assert sys.num_constraints == 0
+    assert sys.num_outputs == 2
+    assert sys.outputs == {T_: ke, c_: constraint}
     assert sys.outputs_symbols == [T_, c_]
-
+    assert sys.states == [q1, q2, u1, u2]
     with pytest.raises(ValueError):
         sys.evaluate_constraints()
     with pytest.raises(ValueError):
@@ -909,7 +979,9 @@ def test_system_with_noncontributing_forces(plot=False):
     with pytest.raises(ValueError):
         sys.outputs = {T_: ke, (T_, c_): (ke, constraint)}
 
+    ###########################################################################
     # Now change the outputs to a new dictionary and make sure things update.
+    ###########################################################################
     K_, c2, X1, X2 = me.dynamicsymbols('K, c2, X1, X2')
     outputs = {
         T_: ke,
@@ -922,17 +994,17 @@ def test_system_with_noncontributing_forces(plot=False):
     sys.outputs = outputs
     assert sys._needs_code_regeneration
 
-    assert sys.num_outputs == 6
-    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2]
-    assert sys._num_simple_outputs == 4
+    assert sys._linear_outputs_forcing_rows == sm.Matrix([10, 11])
+    assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2, 3],
+                                                              [8, 9, 6, 7]])
+    assert sys._linear_outputs_symbols == [X1, X2]
     assert sys._num_linear_outputs == 2
+    assert sys._num_simple_outputs == 4
     assert sys._simple_outputs_matrix == sm.Matrix([ke, constraint, ke,
                                                     constraint])
     assert sys._simple_outputs_symbols == [T_, c_, K_, c2]
-    assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2, 3],
-                                                              [8, 9, 6, 7]])
-    assert sys._linear_outputs_forcing_rows == sm.Matrix([10, 11])
-    assert sys._linear_outputs_symbols == [X1, X2]
+    assert sys.num_outputs == 6
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2]
 
     np.testing.assert_allclose(sys.evaluate_outputs(),
         [0.0, -9.25, 9.5, -0.9092974268256817, 0.0, -0.9092974268256817])
@@ -946,7 +1018,13 @@ def test_system_with_noncontributing_forces(plot=False):
         sys.constraint_loads = (T1, T2, u1)
 
     sys.constraint_loads = (T1, T2)
+    assert sys._needs_code_regeneration
 
+    assert sys._linear_outputs_symbols == [X1, X2, T1, T2]
+    assert sys._num_linear_outputs == 4
+    assert sys._num_simple_outputs == 4
+    assert sys._simple_outputs_matrix == sm.Matrix([ke, constraint, ke,
+                                                    constraint])
     assert sys.num_outputs == 8
     assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2, T1, T2]
 
@@ -963,7 +1041,6 @@ def test_system_with_noncontributing_forces(plot=False):
         q1: 0.1,
         q2: 0.0,
     }
-
 
     np.testing.assert_allclose(sys.evaluate_outputs(),
         [
@@ -989,6 +1066,7 @@ def test_system_with_noncontributing_forces(plot=False):
 
     rhs = sys.generate_ode_function()
     print(rhs.__doc__)
+
 
     if plot:
         import matplotlib.pyplot as plt
