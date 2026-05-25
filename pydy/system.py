@@ -1052,6 +1052,8 @@ class System(object):
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
         # due to args not being necessarily being comprised of arrays.
         elif len(x.shape) == 2:
+            if isinstance(t, float):
+                raise ValueError('t must be array with the same length as x.')
             if x.shape[0] != len(t):
                 raise ValueError('x trajectory must have same length as t.')
             xdot = np.zeros_like(x)
@@ -1121,6 +1123,8 @@ class System(object):
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
         # due to args not being necessarily being comprised of arrays.
         elif len(x.shape) == 2:
+            if isinstance(t, float):
+                raise ValueError('t must be array with the same length as x.')
             if x.shape[0] != len(t):
                 raise ValueError('x trajectory must have same length as t.')
             y = np.zeros((len(t), self.num_outputs))

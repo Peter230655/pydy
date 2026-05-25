@@ -864,6 +864,23 @@ def test_system_with_noncontributing_forces(plot=False):
     # this a good idea?
     np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6))),
                                np.array([[2.0, 1.0], [2.0, 1.0], [2.0, 1.0]]))
+    np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6)),
+                                                    t=[1.0, 2.0, 3.0]),
+                               np.array([[2.0, 1.0], [2.0, 1.0], [2.0, 1.0]]))
+    with pytest.raises(ValueError):  # time should be a float
+        np.testing.assert_allclose(sys.evaluate_outputs(t=[1.0, 2.0, 3.0]),
+                                   np.array([[2.0, 1.0], [2.0, 1.0],
+                                             [2.0, 1.0]]))
+    with pytest.raises(ValueError):  # time should be an array
+        np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6)),
+                                                        t=2.0),
+                                   np.array([[2.0, 1.0], [2.0, 1.0],
+                                             [2.0, 1.0]]))
+    with pytest.raises(ValueError):  # x.shape[0] must equal len(t)
+        np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6)),
+                                                        t=[1.0, 2.0]),
+                                   np.array([[2.0, 1.0], [2.0, 1.0],
+                                             [2.0, 1.0]]))
 
     ###########################################################################
     # Check a system with both constraints and noncontributing forces
@@ -1055,7 +1072,6 @@ def test_system_with_noncontributing_forces(plot=False):
         ])
 
     sys.times = np.linspace(0.0, 4.0, num=400)
-    print(sys.evaluate_ode())
 
     x_traj = sys.integrate()
     assert x_traj.shape == (400, 8)  # shouldn't include dummy states?
