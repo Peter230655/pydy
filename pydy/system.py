@@ -96,25 +96,23 @@ class System(object):
         An array_like object, which contains time values over which
         equations are integrated. It has to be supplied before
         System.integrate() can be called.
-    constraint_loads : iterable of Functions of time, optional
+    noncontributing_symbols : iterable of Functions of time, optional
         If the ``eom_method`` includes noncontributig forces (Kane's method) or
         constraint forces from Lagrange multipliers, provide a list of variable
         names for these forces and they will be computed when evaluating the
         differential equations.
     outputs : dictionary
-        Three possible entries for this dictionary:
-
-            1 .{Function('y')(t): SymPy Expression}
-            2. {(Function('y1')(t), Function('y2')(t): SymPy Column Matrix
-               where y1 and y2 are not present}
-            3. {(Function('f1')(t), Function('f2')(t): SymPy Column Matrix
-               where both expressions are linear f1, f2 and possilby the time
-               derivative of the speeds}
+        Maps functions of time or tuples of functions of time to expressions or
+        iterables of expressions, respectively. In general, the expressions
+        should be a function of the state, constants, and specfieds.
+        Expressions that are linear in the functions of time and/or the time
+        derivatives of the speeds are also supported, but not yet nonlinear
+        functions of these variables.
 
     """
     def __init__(self, eom_method, constants=None, specifieds=None,
                  ode_solver=None, initial_conditions=None, times=None,
-                 outputs=None, constraint_loads=None):
+                 outputs=None, noncontributing_symbols=None):
 
         self._eom_method = eom_method
         self._extract_constraints()
@@ -131,10 +129,10 @@ class System(object):
 
         # NOTE: must be set before the state variables are intialized, so do
         # this first
-        if constraint_loads is None:
-            self._constraint_loads = []
+        if noncontributing_symbols is None:
+            self._noncontributing_symbols = []
         else:
-            self.constraint_loads = constraint_loads  # calls parse_outputs again
+            self.noncontributing_symbols = noncontributing_symbols  # calls parse_outputs again
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
@@ -657,18 +655,18 @@ class System(object):
                              for si in linear_eq_names]
 
     @property
-    def constraint_loads(self):
+    def noncontributing_symbols(self):
         """List of symbolic functions of time representing the constraint loads
         (forces & torques) associated with noncontributing loads."""
-        return self._constraint_loads
+        return self._noncontributing_symbols
 
-    @constraint_loads.setter
-    def constraint_loads(self, constraint_loads):
+    @noncontributing_symbols.setter
+    def noncontributing_symbols(self, noncontributing_symbols):
         if not hasattr(self.eom_method, 'auxiliary_eqs'):
             msg = ('The KanesMethod object has no auxiliary equations and '
                    'thus constraint loads cannot be provided.')
             raise RuntimeError(msg)
-        if len(constraint_loads) != len(self.eom_method._uaux):
+        if len(noncontributing_symbols) != len(self.eom_method._uaux):
             msg = ('You must provide symbols for {} constraint loads that '
                     'are present in the auxiliary equations.')
             raise ValueError(msg.format(len(self.eom_method._uaux)))
@@ -676,11 +674,11 @@ class System(object):
         # equations and that they are not a coordinate, speed, or specified.
         # dj/dt = j' = constraint_load
         # create some dummy impulse states
-        self._constraint_loads = list(constraint_loads)
-        if tuple(constraint_loads) in self.outputs:
+        self._noncontributing_symbols = list(noncontributing_symbols)
+        if tuple(noncontributing_symbols) in self.outputs:
             raise ValueError('Constraint loads already present in outputs.')
 
-        self.outputs[tuple(constraint_loads)] = self.eom_method.auxiliary_eqs
+        self.outputs[tuple(noncontributing_symbols)] = self.eom_method.auxiliary_eqs
         self._parse_outputs()
         self._needs_code_regeneration = True
 

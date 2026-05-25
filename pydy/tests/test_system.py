@@ -797,9 +797,6 @@ def test_system_with_noncontributing_forces(plot=False):
     # TODO : Should these be dynamicsymbols to be consistent?
     int_T1, int_T2 = sm.Symbol('∫ T1 dt'), sm.Symbol('∫ T2 dt')
 
-    u = sm.Matrix([u1, u2])
-    lam = sm.Matrix([T1, T2])
-
     N, A, B = sm.symbols('N, A, B', cls=me.ReferenceFrame)
 
     A.orient_axis(N, q1, N.z)
@@ -807,12 +804,12 @@ def test_system_with_noncontributing_forces(plot=False):
     A.set_ang_vel(N, u1*N.z)
     B.set_ang_vel(N, u2*N.z)
 
-    O = me.Point('O')
-    P1 = O.locatenew('P1', -l1*A.y)
+    O_ = me.Point('O')
+    P1 = O_.locatenew('P1', -l1*A.y)
     P2 = P1.locatenew('P2', -l2*B.y)
 
-    O.set_vel(N, 0)
-    P1.v2pt_theory(O, N, A)
+    O_.set_vel(N, 0)
+    P1.v2pt_theory(O_, N, A)
     P1.set_vel(N, P1.vel(N) - u3*A.y)
     P2.v2pt_theory(P1, N, B)
     P2.set_vel(N, P2.vel(N) - u4*B.y)
@@ -838,23 +835,11 @@ def test_system_with_noncontributing_forces(plot=False):
     )
     kane.kanes_equations()
 
-    # manually augment the equations of motion for the noncontributing forces
-    # [Md 0 ] [u'] = [Fd] => M x = F
-    # [Mu Ml] [l ]   [Fl]
-    x = u.diff().col_join(lam)
-    Md = kane.mass_matrix
-    Fd = kane.forcing
-    Mz = sm.zeros(Md.shape[0], len(lam))
-    MuMl = kane.auxiliary_eqs.jacobian(x)
-    Fl = -kane.auxiliary_eqs.xreplace({fi: 0 for fi in x})
-    M_exp = Md.row_join(Mz).col_join(MuMl)
-    F_exp = Fd.col_join(Fl)
-
     ###########################################################################
     # Check that the system will correctly build with automatic parsing of the
     # auxiliary equations.
     ###########################################################################
-    sys = System(kane, constraint_loads=(T1, T2))
+    sys = System(kane, noncontributing_symbols=(T1, T2))
     assert sys._linear_idxs == [0, 1]
     assert sys._linear_outputs_symbols == [T1, T2]
     assert sys._num_linear_outputs == 2
@@ -863,7 +848,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._simple_outputs_symbols == []
     assert sys.auxiliary_states == [int_T1, int_T2]  # auxiliaries ?
     assert sys.constants_symbols == {m1, m2, l1, l2, c, g}
-    assert sys.constraint_loads == [T1, T2]
+    assert sys.noncontributing_symbols == [T1, T2]
     assert sys.constraints == sm.Matrix([])
     assert sys.coordinates == [q1, q2]
     assert sys.num_constraints == 0
@@ -907,7 +892,7 @@ def test_system_with_noncontributing_forces(plot=False):
         kane_with_con,
         constants={m1: 1.0, m2: 2.0, l1: 1.0, l2: 2.0, c: 1.0, g: 9.81},
         initial_conditions={q1: 0.1, q2: -0.2, u1: 1.4},
-        constraint_loads=(T1, T2),
+        noncontributing_symbols=(T1, T2),
         outputs={T_: ke},
     )
     sys.set_dependent_initial_conditions()
@@ -920,7 +905,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._num_simple_outputs == 2
     assert sys._simple_outputs_matrix == sm.Matrix([ke, mot_con])
     assert sys._simple_outputs_symbols == [T_, fn]
-    assert sys.constraint_loads == [T1, T2]
+    assert sys.noncontributing_symbols == [T1, T2]
     assert sys.constraints == sm.Matrix([mot_con])
     assert sys.num_config_constraints == 0
     assert sys.num_constraints == 1
@@ -945,7 +930,7 @@ def test_system_with_noncontributing_forces(plot=False):
     # equations and only handle additional simple outputs passed into __init__.
     ###########################################################################
     c_ = me.dynamicsymbols('c')
-    constraint = P2.pos_from(O).dot(N.x) - sm.sin(2)
+    constraint = P2.pos_from(O_).dot(N.x) - sm.sin(2)
     outputs = {T_: ke, c_: constraint}
 
     sys = System(kane, outputs=outputs)
@@ -957,7 +942,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._simple_idxs == [0, 1]
     assert sys._simple_outputs_symbols == [T_, c_]
     assert sys.auxiliary_states == []
-    assert sys.constraint_loads == []
+    assert sys.noncontributing_symbols == []
     assert sys.constraints == sm.Matrix([])
     assert sys.num_constraints == 0
     assert sys.num_outputs == 2
@@ -983,6 +968,21 @@ def test_system_with_noncontributing_forces(plot=False):
     # Now change the outputs to a new dictionary and make sure things update.
     ###########################################################################
     K_, c2, X1, X2 = me.dynamicsymbols('K, c2, X1, X2')
+    outputs = {
+        T_: ke,
+        X1: 2*X1 + 4*u1.diff() + 5*u2.diff() - 10,  # check singelton works
+        c_: constraint,
+        (K_, c2): [ke, constraint],
+    }
+
+    sys.outputs = outputs
+    assert sys._needs_code_regeneration
+
+    assert sys._linear_outputs_forcing_rows == sm.Matrix([10])
+    assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2]])
+    assert sys._linear_outputs_symbols == [X1]
+    assert sys._num_linear_outputs == 1
+
     outputs = {
         T_: ke,
         (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff() - 10,
@@ -1015,9 +1015,9 @@ def test_system_with_noncontributing_forces(plot=False):
     # of constraint load symbols and they have to be present in the auxiliary
     # equations.
     with pytest.raises(ValueError):  # too many symbols
-        sys.constraint_loads = (T1, T2, u1)
+        sys.noncontributing_symbols = (T1, T2, u1)
 
-    sys.constraint_loads = (T1, T2)
+    sys.noncontributing_symbols = (T1, T2)
     assert sys._needs_code_regeneration
 
     assert sys._linear_outputs_symbols == [X1, X2, T1, T2]
@@ -1066,7 +1066,6 @@ def test_system_with_noncontributing_forces(plot=False):
 
     rhs = sys.generate_ode_function()
     print(rhs.__doc__)
-
 
     if plot:
         import matplotlib.pyplot as plt
