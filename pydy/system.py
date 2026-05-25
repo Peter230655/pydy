@@ -665,8 +665,10 @@ class System(object):
             xd = [ui.diff() for ui in self.speeds] + linear_eq_names
             # TOOD : linear_eq_to_matrix is ideal here but doesn't function in
             # oldest supported SymPy, .jacobian() can be very slow.
-            mass_matrix_rows = funcs_of_xdot.jacobian(xd)
-            forcing_rows = -funcs_of_xdot.xreplace({xdi: 0 for xdi in xd})
+            mass_matrix_rows, forcing_rows = sm.linear_eq_to_matrix(
+                funcs_of_xdot, xd)
+            #mass_matrix_rows = funcs_of_xdot.jacobian(xd)
+            #forcing_rows = -funcs_of_xdot.xreplace({xdi: 0 for xdi in xd})
         else:
             mass_matrix_rows = sm.Matrix([])
             forcing_rows = sm.Matrix([])
