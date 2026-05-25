@@ -1,5 +1,6 @@
 """The System class manages the simulation (integration) of a system whose
-equations are given by :py:class:`KanesMethod`.
+equations are given by
+:external+sympy:py:class:`~sympy.physics.mechanics.kane.KanesMethod`.
 
 Many of the attributes are also properties, and can be directly modified.
 
@@ -28,15 +29,15 @@ which we have already invoked
            [0., 0., 0., 0.]])
 
 In this case, we use defaults for the numerical values of the constants,
-specified quantities, initial conditions, etc. You probably won't like
-these defaults. You can also specify such values via constructor keyword
-arguments or via the attributes::
+specified quantities, initial conditions, etc. You probably won't like these
+defaults. You can also specify such values via constructor keyword arguments or
+via the attributes::
 
+    >>> import sympy as sm
     >>> sys = System(kane,
     ...              initial_conditions={kane.q[1]: 0.5},
     ...              times=times)
     ...
-    >>> import sympy as sm
     >>> g, l0, m0, m1 = list(sm.ordered(sys.constants_symbols))
     >>> sys.constants = {m1: 5.0}
     >>> sys.integrate()
@@ -53,7 +54,7 @@ look at these properties::
     [u0(t), u1(t)]
     >>> sys.states
     [q0(t), q1(t), u0(t), u1(t)]
-    >>> sys.constants_symbols
+    >>> sys.constants_symbols  # doctest: +SKIP
     {g, l0, m0, m1}
     >>> sys.specifieds_symbols
     {F(t)}
@@ -74,9 +75,10 @@ equations::
            [8.92619991e-01],
            [7.01894807e-04]])
 
-In the prior examples, the System generates the numerical ode function for you
-behind the scenes. If you want to customize how this function is generated, you
-must call :py:func:`generate_ode_function` on your own::
+In the prior examples, the :py:class:`System` generates the numerical ode
+function for you behind the scenes. If you want to customize how this function
+is generated, you must call
+:py:meth:`~pydy.system.System.generate_ode_function` on your own::
 
     >>> sys.generate_ode_function(generator='cython')
     >>> sys.integrate()
@@ -99,7 +101,6 @@ from .utils import PyDyFutureWarning, PyDyUserWarning
 
 SYMPY_VERSION = sm.__version__
 
-
 warnings.simplefilter('once', PyDyFutureWarning)
 
 
@@ -110,27 +111,31 @@ class System(object):
     constructor.
 
     The parameters to this constructor are all attributes of the System.
-    Actually, they are properties. With the exception of ``eom_method``,
-    these attributes can be modified directly at any future point.
+    Actually, they are properties. With the exception of
+    :py:meth:`~pydy.system.System.eom_method`, these attributes can be modified
+    directly at any future point.
 
     Parameters
     ----------
     eom_method : sympy.physics.mechanics.KanesMethod
-        You must have called ``KanesMethod.kanes_equations()`` *before*
-        constructing this ``System``.
+        You must have called
+        :external+sympy:py:meth:`~sympy.physics.mechanics.kane.KanesMethod.kanes_equations`
+        *before* constructing this system.
     constants : dict, optional (default: all 1.0)
-        This dictionary maps SymPy Symbol objects to floats.
+        This dictionary maps SymPy :external+sympy:py:class:`~Symbol` objects
+        to floats.
     specifieds : dict, optional (default: all 0.0)
         This dictionary maps SymPy Functions of time objects, or tuples of
         them, to floats, NumPy arrays, or functions of the state and time.
-    ode_solver : function, optional (default: scipy.integrate.odeint)
-        This function computes the derivatives of the states.
+    ode_solver : function, optional
+        This function computes the derivatives of the states. The default is
+        :external+scipy:py:class:`scipy.integrate.odeint`.
     initial_conditions : dict, optional (default: all zero)
         This dictionary maps SymPy Functions of time objects to floats.
     times : array_like, shape(n,), optional
-        An array_like object, which contains time values over which
-        equations are integrated. It has to be supplied before
-        System.integrate() can be called.
+        An array_like object, which contains time values over which equations
+        are integrated. It has to be supplied before
+        :py:meth:`~System.integrate` can be called.
     outputs : dictionary
         Maps functions of time or tuples of functions of time to expressions or
         iterables of expressions, respectively. In general, the expressions
@@ -139,15 +144,23 @@ class System(object):
         derivatives of the speeds are also supported, but not yet nonlinear
         functions of these variables.
     noncontributing_symbols : iterable of Functions of time, optional
-        If the ``eom_method`` includes noncontributig forces (Kane's method) or
-        constraint forces from Lagrange multipliers, provide a list of variable
-        names for these forces and they will be computed when evaluating the
-        differential equations.
+        If the ``eom_method`` includes noncontributig forces (Kane's method),
+        provide a list of variable names for these forces and they will be
+        computed when evaluating the differential equations.
+    constants_symbols : iterable of Symbol, optional
+        If provided, the system's equations will not be searched for the
+        minimal set of constants. It is best to provide these for large system
+        equations, as the search can be prohibitively long in duration.
+    specifieds_symbols : iterable of Functions of time, optional
+        If provided, the system's equations will not be searched for the
+        minimal set of specifieds. It is best to provide these for large system
+        equations, as the search can be prohibitively long in duration.
 
     """
     def __init__(self, eom_method, constants=None, specifieds=None,
                  ode_solver=None, initial_conditions=None, times=None,
-                 outputs=None, noncontributing_symbols=None):
+                 outputs=None, noncontributing_symbols=None,
+                 constants_symbols=None, specifieds_symbols=None):
 
         self._eom_method = eom_method
         self._extract_constraints()
@@ -165,18 +178,22 @@ class System(object):
         # NOTE: must be set before the state variables are intialized, so do
         # this first
         if noncontributing_symbols is None:
-            self._noncontributing_symbols = []
+            self._noncontributing_symbols = tuple()
         else:
             # calls parse_outputs again:
-            self.noncontributing_symbols = noncontributing_symbols
+            self.noncontributing_symbols = tuple(noncontributing_symbols)
 
         # TODO : What if user adds symbols after constructing a System?
-        # TODO : For large equations of motion, these two methods can take
-        # unncessary time. One option is to let the user optionally pass in
-        # these lists of symbols or derive them from the constants and
-        # specifieds dictionaries.
-        self._constants_symbols = self._Kane_constant_symbols()
-        self._specifieds_symbols = self._Kane_undefined_dynamicsymbols()
+        # TODO : Make these tuples instead of sets.
+        # TODO : Search needs to include the output functions.
+        if constants_symbols is None:
+            self._constants_symbols = self._Kane_constant_symbols()
+        else:
+            self._constants_symbols = set(constants_symbols)
+        if specifieds_symbols is None:
+            self._specifieds_symbols = self._Kane_undefined_dynamicsymbols()
+        else:
+            self._specifieds_symbols = set(specifieds_symbols)
 
         if constants is None:
             self.constants = dict()
@@ -199,7 +216,7 @@ class System(object):
             self.initial_conditions = initial_conditions
 
         if times is None:
-            self.times = []
+            self.times = []  # gets converted to empty array([])
         else:
             self.times = times
 
@@ -215,10 +232,20 @@ class System(object):
         return self.eom_method.q[:]
 
     @property
+    def num_coordinates(self):
+        """Returns the number of coordinates."""
+        return len(self.coordinates)
+
+    @property
     def speeds(self):
         """Returns a list of the symbolic functions of time representing the
         system's generalized speeds."""
         return self.eom_method.u[:]
+
+    @property
+    def num_speeds(self):
+        """Returns the number of speeds."""
+        return len(self.speeds)
 
     @property
     def states(self):
@@ -238,11 +265,15 @@ class System(object):
             return self.coordinates + self.speeds
 
     @property
-    def eom_method(self):
-        """This is a sympy.physics.mechanics.KanesMethod. The method used to
-        generate the equations of motion. Read-only.
+    def num_states(self):
+        """Returns the number of states."""
+        return len(self.states)
 
-        """
+    @property
+    def eom_method(self):
+        """This is a
+        :external+sympy:py:class:`~sympy.physics.mechanics.KanesMethod`. The
+        method used to generate the equations of motion. Read-only."""
         return self._eom_method
 
     @property
@@ -259,6 +290,11 @@ class System(object):
     def constants(self, constants):
         self._check_constants(constants)
         self._constants = constants
+
+    @property
+    def num_constants(self):
+        """Returns the number of constants."""
+        return len(self.constants_symbols)
 
     @property
     def constants_symbols(self):
@@ -336,6 +372,11 @@ class System(object):
     def specifieds(self, specifieds):
         self._check_specifieds(specifieds)
         self._specifieds = specifieds
+
+    @property
+    def num_specifieds(self):
+        """Returns the number of specifieds."""
+        return len(self.specifieds_symbols)
 
     @property
     def specifieds_symbols(self):
@@ -446,7 +487,8 @@ class System(object):
     @property
     def ode_solver(self):
         """A function that performs forward integration. It must have the same
-        signature as :py:func:`scipy.integrate.odeint`, which is::
+        signature as :external+scipy::py:func:`scipy.integrate.odeint`, which
+        is::
 
             x_history = ode_solver(f, x0, t, args=f_args)
 
@@ -454,7 +496,7 @@ class System(object):
         conditions, ``x_history`` is the state time history, ``x`` is the
         state, ``t`` is the time, and ``args`` is a keyword argument takes
         arguments that are then passed to ``f``. The default solver is
-        ``odeint``.
+        :external+scipy::py:func:`scipy.integrate.odeint`.
 
         Examples
         ========
@@ -674,7 +716,7 @@ class System(object):
             forcing_rows = sm.Matrix([])
 
         self.auxiliaries = [sm.Symbol('∫ ' + s.name + ' dt') for s in
-                                 linear_eq_names]
+                            linear_eq_names]
         self._num_linear_outputs = len(linear_eq_names)
         self._linear_outputs_symbols = linear_eq_names
         self._linear_outputs_mass_matrix_rows = mass_matrix_rows
@@ -685,12 +727,17 @@ class System(object):
                                      for ci in self._con_syms]
 
         self.outputs_symbols = output_names_in_order
-        self.num_outputs = len(output_names_in_order)
+        self._num_outputs = len(output_names_in_order)
 
         self._simple_idxs = [output_names_in_order.index(si)
                              for si in simple_outputs_names]
         self._linear_idxs = [output_names_in_order.index(si)
                              for si in linear_eq_names]
+
+    @property
+    def num_outputs(self):
+        self._parse_outputs()  # potentially costly, but may not be up-to-date
+        return self._num_outputs
 
     @property
     def noncontributing_symbols(self):
@@ -723,12 +770,13 @@ class System(object):
 
     @property
     def evaluate_ode_function(self):
-        """A function generated by ``generate_ode_function`` that computes
-        the state derivatives:
+        """A function generated by
+        :py:func:`~pydy.codegen.ode_function_generators.generate_ode_function`
+        that computes the state derivatives::
 
             x' = evaluate_ode_function(x, t, *args)
 
-        This function is used by the ``ode_solver``.
+        This function is used by the :py:meth:`~pydy.system.System.ode_solver`.
 
         """
         # TODO : It would be more useful if the generated docstring was shown
@@ -860,7 +908,8 @@ class System(object):
             If true the Jacobian of the constraint equations will be used to
             solve the constraint equations for the dependent states.
         root_kwargs
-            Extra keyword arguments that are passed to ``scipy.optimize.root``.
+            Extra keyword arguments that are passed to
+            :external+scipy:py:func`scipy.optimize.root`.
 
         """
         # TODO : The nonholonomic constraints can be solved analytically, root
@@ -929,15 +978,16 @@ class System(object):
             self.initial_conditions[si] = vi
 
     def generate_ode_function(self, **kwargs):
-        """Calls :py:func:`~generate_ode_function` with the appropriate
-        arguments, and sets the ``evaluate_ode_function`` attribute to the
-        resulting function.
+        """Calls
+        :py:func:`~pydy.codegen.ode_function_generators.generate_ode_function`
+        with the appropriate arguments, and sets the ``evaluate_ode_function``
+        attribute to the resulting function.
 
         Parameters
         ----------
         kwargs
             All other kwargs are passed onto
-            ``pydy.codegen.ode_function_generators.generate_ode_function()``.
+            :py:func:`pydy.codegen.ode_function_generators.generate_ode_function`.
             Don't specify the ``specifieds`` keyword argument though; the
             ``System`` class takes care of those.
 
@@ -1064,8 +1114,9 @@ class System(object):
         =====
 
         This method is present for convenience, it is not designed to be used
-        where performance matters, use :py:meth:`System.evaluate_ode_function`
-        directly when performance is needed.
+        where performance matters, use
+        :py:meth:`~pydy.system.System.evaluate_ode_function` directly when
+        performance is needed.
 
         To see the order of the state values use::
 
@@ -1125,8 +1176,9 @@ class System(object):
         =====
 
         This method is present for convenience, it is not designed to be used
-        where performance matters, use :py:meth:`System.evaluate_ode_function`
-        directly when performance is needed.
+        where performance matters, use
+        :py:meth:`~pydy.system.System.evaluate_ode_function` directly when
+        performance is needed.
 
         To see the order of the state values use::
 
@@ -1169,7 +1221,7 @@ class System(object):
             y = np.zeros((len(t), self.num_outputs))
             for i, (ti, xi) in enumerate(zip(t, x)):
                 if (self._linear_outputs_symbols and
-                    self._simple_outputs_symbols):
+                        self._simple_outputs_symbols):
                     xdot, y1 = self.evaluate_ode_function(xi, ti, *args)
                     y[i, self._simple_idxs] = y1
                     y[i, self._linear_idxs] = xdot[-len(self.auxiliaries):]
@@ -1342,11 +1394,9 @@ class System(object):
         # NOTE : User cannot pass in args, System handles that.
         solver_kwargs.pop('args', None)
 
-
         # NOTE : skip the outputs if present
         def func(*args, **kwargs):
             return self.evaluate_ode_function(*args, **kwargs)[0]
-
 
         x_history = self.ode_solver(
             (func if self._simple_outputs_symbols else
