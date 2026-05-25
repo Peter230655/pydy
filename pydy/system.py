@@ -109,9 +109,9 @@ class System(object):
     See the class's attributes for a description of the arguments to this
     constructor.
 
-    The parameters to this constructor are all attributes of the System.
-    Actually, they are properties. With the exception of ``eom_method``,
-    these attributes can be modified directly at any future point.
+    The parameters to this constructor are all attributes of the System.  With
+    the exception of ``eom_method``, these attributes can be modified directly
+    at any future point.
 
     Parameters
     ----------
@@ -131,7 +131,7 @@ class System(object):
         An array_like object, which contains time values over which
         equations are integrated. It has to be supplied before
         System.integrate() can be called.
-    outputs : dictionary
+    outputs : dictionary, optional
         Maps functions of time or tuples of functions of time to expressions or
         iterables of expressions, respectively. In general, the expressions
         should be a function of the state, constants, and specfieds.
