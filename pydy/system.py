@@ -851,7 +851,9 @@ class System(object):
 
         x = self._initial_conditions_array
         p = self._constants_array
-        dep_guess = [self.initial_conditions[xi] for xi in dep_vars]
+        dep_guess = [self.initial_conditions[xi]
+                     if xi in self.initial_conditions else 0.0
+                     for xi in dep_vars]
         dep_idxs = [self.states.index(xi) for xi in dep_vars]
 
         if use_jac:
