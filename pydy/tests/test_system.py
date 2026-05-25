@@ -846,7 +846,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._num_simple_outputs == 0
     assert sys._simple_idxs == []
     assert sys._simple_outputs_symbols == []
-    assert sys.auxiliary_states == [int_T1, int_T2]  # auxiliaries ?
+    assert sys.auxiliaries == [int_T1, int_T2]
     assert sys.constants_symbols == {m1, m2, l1, l2, c, g}
     assert sys.noncontributing_symbols == [T1, T2]
     assert sys.constraints == sm.Matrix([])
@@ -941,7 +941,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._num_simple_outputs == 2
     assert sys._simple_idxs == [0, 1]
     assert sys._simple_outputs_symbols == [T_, c_]
-    assert sys.auxiliary_states == []
+    assert sys.auxiliaries == []
     assert sys.noncontributing_symbols == []
     assert sys.constraints == sm.Matrix([])
     assert sys.num_constraints == 0

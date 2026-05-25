@@ -196,7 +196,7 @@ class System(object):
         # requires settable attributes : outputs
 
         if self._linear_outputs_symbols:
-            speeds = self.speeds + self.auxiliary_states
+            speeds = self.speeds + self.auxiliaries
             return self.coordinates + speeds
         else:
             return self.coordinates + self.speeds
@@ -635,7 +635,7 @@ class System(object):
             mass_matrix_rows = sm.Matrix([])
             forcing_rows = sm.Matrix([])
 
-        self.auxiliary_states = [sm.Symbol('∫ ' + s.name + ' dt') for s in
+        self.auxiliaries = [sm.Symbol('∫ ' + s.name + ' dt') for s in
                                  linear_eq_names]
         self._num_linear_outputs = len(linear_eq_names)
         self._linear_outputs_symbols = linear_eq_names
@@ -707,7 +707,7 @@ class System(object):
             # [Md  0] [u'] = [Fd]
             # [Mu Mj] [j']   [Fa]
             forcing = Fd.col_join(Fa)
-            speeds = self.speeds + self.auxiliary_states
+            speeds = self.speeds + self.auxiliaries
         else:
             forcing = self.eom_method.forcing
             speeds = self.speeds
@@ -1110,12 +1110,12 @@ class System(object):
                 y = np.zeros(self.num_outputs)
                 xdot, y1 = self.evaluate_ode_function(x, t, *args)
                 y[self._simple_idxs] = y1
-                y[self._linear_idxs] = xdot[-len(self.auxiliary_states):]
+                y[self._linear_idxs] = xdot[-len(self.auxiliaries):]
                 return y
             elif (self._linear_outputs_symbols and not
                   self._simple_outputs_symbols):
                 xdot = self.evaluate_ode_function(x, t, *args)
-                return xdot[-len(self.auxiliary_states):]
+                return xdot[-len(self.auxiliaries):]
             else:
                 return self.evaluate_ode_function(x, t, *args)[1]
         # NOTE : I tried to make use of numpy.vectorize but it is not possible
@@ -1129,11 +1129,11 @@ class System(object):
                     self._simple_outputs_symbols):
                     xdot, y1 = self.evaluate_ode_function(xi, ti, *args)
                     y[i, self._simple_idxs] = y1
-                    y[i, self._linear_idxs] = xdot[-len(self.auxiliary_states):]
+                    y[i, self._linear_idxs] = xdot[-len(self.auxiliaries):]
                 elif (self._linear_outputs_symbols and not
                       self._simple_outputs_symbols):
                     xdot = self.evaluate_ode_function(xi, ti, *args)
-                    y[i, :] = xdot[-len(self.auxiliary_states):]
+                    y[i, :] = xdot[-len(self.auxiliaries):]
                 else:
                     y[i, :] = self.evaluate_ode_function(xi, ti, *args)[1]
             return y
