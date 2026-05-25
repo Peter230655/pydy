@@ -47,16 +47,30 @@ class TestSystem():
         # -----------------------------------
         sys = System(self.kane)
 
-        assert (sys.constants_symbols ==
-                set(sm.symbols('k0, m0, g, c0')))
-        assert sys.specifieds_symbols == {self.specified_symbol}
-        assert sys.states == me.dynamicsymbols('x0, v0')
-        assert sys.evaluate_ode_function is None
+        assert sys.auxiliaries == []
+        assert sys.constants == dict()
+        assert sys.constants_symbols == set(sm.symbols('k0, m0, g, c0'))
+        assert sys.constraints == sm.Matrix([])
+        assert sys.coordinates == [me.dynamicsymbols('x0')]
         assert sys.eom_method is self.kane
+        assert sys.evaluate_ode_function is None
+        assert sys.initial_conditions == dict()
+        assert sys.noncontributing_symbols == []
+        assert sys.num_auxiliaries == 0
+        assert sys.num_config_constraints == 0
+        assert sys.num_constants == 4
+        assert sys.num_constraints == 0
+        assert sys.num_coordinates == 1
+        assert sys.num_motion_constraints == 0
+        assert sys.num_outputs == 0
+        assert sys.num_specifieds == 1
+        assert sys.num_speeds == 1
+        assert sys.num_states == 2
         assert sys.ode_solver is odeint
         assert sys.specifieds == dict()
-        assert sys.initial_conditions == dict()
-        assert sys.constants == dict()
+        assert sys.specifieds_symbols == {self.specified_symbol}
+        assert sys.speeds == [me.dynamicsymbols('v0')]
+        assert sys.states == list(me.dynamicsymbols('x0, v0'))
         np.testing.assert_allclose(sys.times, np.array([]))
 
         # Specify a bunch of attributes during construction.
@@ -553,6 +567,7 @@ def test_specifying_coordinate_issue_339():
     sys.times = np.linspace(0, 10, 20)
 
     sys.integrate()
+
 
 def test_system_with_constraints(plot=False):
     """Rolling disc. Start with disc suspended above a ground plane. Use a

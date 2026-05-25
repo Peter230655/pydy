@@ -64,12 +64,14 @@ look at these properties::
 You can also add additional equations to evaluate alongside the differential
 equations::
 
-    >>> k = sm.Symbol('k')
+    >>> k0 = sm.Symbol('k0')
     >>> sys = System(kane,
     ...              initial_conditions={kane.q[1]: 0.5},
     ...              times=times,
-    ...              outputs={k: m0*sys.speeds[0]**2/2})
+    ...              outputs={k0: m0*sys.speeds[0]**2/2})
     >>> x = sys.integrate()
+    >>> sys.outputs_symbols
+    [k0]
     >>> sys.evaluate_outputs(x=x)
     array([[0.00000000e+00],
            [8.92619991e-01],
@@ -164,6 +166,8 @@ class System(object):
         self._eom_method = eom_method
         self._extract_constraints()
 
+        self._auxiliaries = []
+
         if outputs is None:
             outputs = dict()
 
@@ -247,6 +251,18 @@ class System(object):
         return len(self.speeds)
 
     @property
+    def auxiliaries(self):
+        """Returns a list of the symbols representing the system's auxiliary
+        states which are the time integrals of any outputs that are linear
+        functions of the time derivatices of the generalized speeds."""
+        return self._auxiliaries
+
+    @property
+    def num_auxiliaries(self):
+        """Returns the number of auxiliaries."""
+        return len(self.auxiliaries)
+
+    @property
     def states(self):
         """Returns a list of the symbolic functions of time representing the
         system's states, i.e. generalized coordinates plus the generalized
@@ -256,7 +272,6 @@ class System(object):
 
         """
         # requires settable attributes : outputs
-
         if self._linear_outputs_symbols:
             speeds = self.speeds + self.auxiliaries
             return self.coordinates + speeds
@@ -310,8 +325,7 @@ class System(object):
                 raise ValueError("Symbol {} is not a constant.".format(k))
 
     def _constants_padded_with_defaults(self):
-        d = dict(zip(self.constants_symbols,
-                     repeat(1.0, len(self.constants_symbols))))
+        d = dict(zip(self.constants_symbols, repeat(1.0, self.num_constants)))
         d.update(self.constants)
         return d
 
@@ -452,7 +466,7 @@ class System(object):
 
     def _specifieds_padded_with_defaults(self):
         d = dict(zip(self.specifieds_symbols,
-                     repeat(0.0, len(self.specifieds_symbols))))
+                     repeat(0.0, self.num_specifieds)))
         d.update(self.specifieds)
         return d
 
@@ -560,7 +574,7 @@ class System(object):
                 raise ValueError("Symbol {} is not a state.".format(k))
 
     def _initial_conditions_padded_with_defaults(self):
-        d = dict(zip(self.states, repeat(0.0, len(self.states))))
+        d = dict(zip(self.states, repeat(0.0, self.num_states)))
         d.update(self.initial_conditions)
         return d
 
@@ -581,15 +595,15 @@ class System(object):
 
             outputs[p(t)] = k*x(t)
 
-        A tuple of functions of time mapped to to functions of the state::
+        A tuple of functions of time mapped to functions of the state::
 
             outputs[(f1(t), f2(t))] = (k*x(t), c*v(t))
 
         A tuple of functions of time mapped to a system of linear equations in
         the functions and the time derivatives of the states::
 
-            outputs[(m1(t), m2(t))] = (m1(t) - 4*m2(t) + k*x(t).diff(t) + 2,
-                                       m1(t) + 3*m2(t) - theta.diff(t))
+            outputs[(m1(t), m2(t))] = (m1(t) - 4*m2(t) + k*v(t).diff(t) + 2,
+                                       m1(t) + 3*m2(t) - omega.diff(t))
 
         If equations of the last form are provided, this linear system will be
         numerically solved alongside the ordinary differential equations.
@@ -671,6 +685,10 @@ class System(object):
         funcs_of_xdot = []
         linear_eq_names = []
 
+        # TODO : KanesMethod should store the linear components of the
+        # auxiliary equations. It should also have a method/attribute to return
+        # the augmented mass matrix and forcing vector.
+
         for var, expr in self.outputs.items():
             if isinstance(var, tuple):
                 for v, e in zip(var, expr):
@@ -709,8 +727,8 @@ class System(object):
             mass_matrix_rows = sm.Matrix([])
             forcing_rows = sm.Matrix([])
 
-        self.auxiliaries = [sm.Symbol('∫ ' + s.name + ' dt') for s in
-                            linear_eq_names]
+        self._auxiliaries = [sm.Symbol('∫ ' + s.name + ' dt') for s in
+                             linear_eq_names]
         self._num_linear_outputs = len(linear_eq_names)
         self._linear_outputs_symbols = linear_eq_names
         self._linear_outputs_mass_matrix_rows = mass_matrix_rows
@@ -731,6 +749,7 @@ class System(object):
 
     @property
     def num_outputs(self):
+        """Returns the number of outputs."""
         self._parse_outputs()  # potentially costly, but may not be up-to-date
         return self._num_outputs
 
@@ -752,8 +771,6 @@ class System(object):
             raise ValueError(msg.format(len(self.eom_method._uaux)))
         # TODO : Check that the constraint loads are present in the auxiliary
         # equations and that they are not a coordinate, speed, or specified.
-        # dj/dt = j' = constraint_load
-        # create some dummy impulse states
         # TODO : What is this check?
         self._noncontributing_symbols = list(noncontributing_symbols)
         if tuple(noncontributing_symbols) in self.outputs:
@@ -861,8 +878,18 @@ class System(object):
         else:
             self.motion_constraints = sm.Matrix([])
 
-        self.num_config_constraints = len(self.config_constraints)
-        self.num_motion_constraints = len(self.motion_constraints)
+        self._num_config_constraints = len(self.config_constraints)
+        self._num_motion_constraints = len(self.motion_constraints)
+
+    @property
+    def num_config_constraints(self):
+        """Number of configuration constraints."""
+        return self._num_config_constraints
+
+    @property
+    def num_motion_constraints(self):
+        """Number of motion constraints."""
+        return self._num_motion_constraints
 
     @property
     def constraints(self):
