@@ -16,38 +16,73 @@ The simplest usage of this class is as follows. First, we need a
 which we have already invoked
 :external+sympy:py:meth:`~sympy.physics.mechanics.kane.KanesMethod.kanes_equations`::
 
-    km = KanesMethod(...)
-    km.kanes_equations(force_list, body_list)
-    times = np.linspace(0, 5, 100)
-    sys = System(km, times=times)
-    sys.integrate()
+    >>> from sympy.physics.mechanics.models import n_link_pendulum_on_cart
+    >>> from pydy.system import System
+    >>> import numpy as np
+    >>> kane = n_link_pendulum_on_cart()
+    >>> times = np.linspace(0.0, 5.0, num=3)
+    >>> sys = System(kane, times=times)
+    >>> sys.integrate()
+    array([[0., 0., 0., 0.],
+           [0., 0., 0., 0.],
+           [0., 0., 0., 0.]])
 
 In this case, we use defaults for the numerical values of the constants,
 specified quantities, initial conditions, etc. You probably won't like
 these defaults. You can also specify such values via constructor keyword
 arguments or via the attributes::
 
-    sys = System(km,
-                 initial_conditions={dynamicsymbol('q1'): 0.5},
-                 times=times)
-    sys.constants = {symbol('m'): 5.0}
-    sys.integrate()
+    >>> sys = System(kane,
+    ...              initial_conditions={kane.q[1]: 0.5},
+    ...              times=times)
+    ...
+    >>> import sympy as sm
+    >>> g, l0, m0, m1 = list(sm.ordered(sys.constants_symbols))
+    >>> sys.constants = {m1: 5.0}
+    >>> sys.integrate()
+    array([[ 0.        ,  0.5       ,  0.        ,  0.        ],
+           [-1.12276473,  4.19253522, -0.77003647,  1.86016638],
+           [-1.00443253,  5.47085374, -0.4536987 , -0.7915558 ]])
 
 To double-check the constants, specifieds, states and times in your problem,
 look at these properties::
 
-    sys.constants_symbols
-    sys.specifieds_symbols
-    sys.states
-    sys.times
+    >>> sys.coordinates
+    [q0(t), q1(t)]
+    >>> sys.speeds
+    [u0(t), u1(t)]
+    >>> sys.states
+    [q0(t), q1(t), u0(t), u1(t)]
+    >>> sys.constants_symbols
+    {g, l0, m0, m1}
+    >>> sys.specifieds_symbols
+    {F(t)}
+    >>> sys.times
+    array([0. , 2.5, 5. ])
 
-In this case, the System generates the numerical ode function for you
-behind the scenes. If you want to customize how this function is generated,
-you must call ``generate_ode_function`` on your own::
+You can also add additional equations to evaluate alongside the differential
+equations::
 
-    sys = System(KM)
-    sys.generate_ode_function(generator='cython')
-    sys.integrate()
+    >>> k = sm.Symbol('k')
+    >>> sys = System(kane,
+    ...              initial_conditions={kane.q[1]: 0.5},
+    ...              times=times,
+    ...              outputs={k: m0*sys.speeds[0]**2/2})
+    >>> x = sys.integrate()
+    >>> sys.evaluate_outputs(x=x)
+    array([[0.00000000e+00],
+           [8.92619991e-01],
+           [7.01894807e-04]])
+
+In the prior examples, the System generates the numerical ode function for you
+behind the scenes. If you want to customize how this function is generated, you
+must call :py:func:`generate_ode_function` on your own::
+
+    >>> sys.generate_ode_function(generator='cython')
+    >>> sys.integrate()
+    array([[ 0.        ,  0.5       ,  0.        ,  0.        ],
+           [-0.31425675,  3.29123866, -1.33612873,  2.70246056],
+           [-0.48148282,  5.77849021, -0.03746718, -0.08560791]])
 
 """
 import warnings
@@ -96,11 +131,6 @@ class System(object):
         An array_like object, which contains time values over which
         equations are integrated. It has to be supplied before
         System.integrate() can be called.
-    noncontributing_symbols : iterable of Functions of time, optional
-        If the ``eom_method`` includes noncontributig forces (Kane's method) or
-        constraint forces from Lagrange multipliers, provide a list of variable
-        names for these forces and they will be computed when evaluating the
-        differential equations.
     outputs : dictionary
         Maps functions of time or tuples of functions of time to expressions or
         iterables of expressions, respectively. In general, the expressions
@@ -108,6 +138,11 @@ class System(object):
         Expressions that are linear in the functions of time and/or the time
         derivatives of the speeds are also supported, but not yet nonlinear
         functions of these variables.
+    noncontributing_symbols : iterable of Functions of time, optional
+        If the ``eom_method`` includes noncontributig forces (Kane's method) or
+        constraint forces from Lagrange multipliers, provide a list of variable
+        names for these forces and they will be computed when evaluating the
+        differential equations.
 
     """
     def __init__(self, eom_method, constants=None, specifieds=None,
@@ -132,7 +167,8 @@ class System(object):
         if noncontributing_symbols is None:
             self._noncontributing_symbols = []
         else:
-            self.noncontributing_symbols = noncontributing_symbols  # calls parse_outputs again
+            # calls parse_outputs again:
+            self.noncontributing_symbols = noncontributing_symbols
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : For large equations of motion, these two methods can take
@@ -397,7 +433,7 @@ class System(object):
 
         # TODO : this check can probably be removed.
         if len(times.shape) == 0:
-            raise TypeError("Times supplied should be in an array_like format.")
+            raise TypeError("Times should be in an array_like format.")
 
         if not np.all(times >= 0):
             raise ValueError("Times supplied must have positive values.")
@@ -678,7 +714,8 @@ class System(object):
         if tuple(noncontributing_symbols) in self.outputs:
             raise ValueError('Constraint loads already present in outputs.')
 
-        self.outputs[tuple(noncontributing_symbols)] = self.eom_method.auxiliary_eqs
+        non_syms = tuple(noncontributing_symbols)
+        self.outputs[non_syms] = self.eom_method.auxiliary_eqs
         self._parse_outputs()
         self._needs_code_regeneration = True
 
@@ -1359,8 +1396,8 @@ class System(object):
         return functions_of_time.difference(from_sym_lists)
 
     def _Kane_constant_symbols(self):
-        """Similar to ``_find_othersymbols()``, except it checks all syms used in
-        the system.
+        """Similar to ``_find_othersymbols()``, except it checks all syms used
+        in the system.
 
         Remove the time symbol.
 
