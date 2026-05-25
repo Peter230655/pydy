@@ -169,8 +169,8 @@ class System(object):
             outputs = dict()
 
         if self.constraints:
-            self._con_syms = [sm.Dummy('c' + str(i)) for i in
-                              range(self.num_constraints)]
+            self._con_syms = tuple(sm.Dummy('c' + str(i)) for i in
+                                   range(self.num_constraints))
             outputs[self._con_syms] = self.constraints
 
         self.outputs = outputs  # calls _parse_outputs
@@ -561,8 +561,7 @@ class System(object):
                 raise ValueError("Symbol {} is not a state.".format(k))
 
     def _initial_conditions_padded_with_defaults(self):
-        d = dict(zip(self.states,
-                     repeat(0.0, len(self.states))))
+        d = dict(zip(self.states, repeat(0.0, len(self.states))))
         d.update(self.initial_conditions)
         return d
 
@@ -705,12 +704,8 @@ class System(object):
         if funcs_of_xdot:
             funcs_of_xdot = sm.Matrix(funcs_of_xdot)
             xd = [ui.diff() for ui in self.speeds] + linear_eq_names
-            # TOOD : linear_eq_to_matrix is ideal here but doesn't function in
-            # oldest supported SymPy, .jacobian() can be very slow.
             mass_matrix_rows, forcing_rows = sm.linear_eq_to_matrix(
                 funcs_of_xdot, xd)
-            #mass_matrix_rows = funcs_of_xdot.jacobian(xd)
-            #forcing_rows = -funcs_of_xdot.xreplace({xdi: 0 for xdi in xd})
         else:
             mass_matrix_rows = sm.Matrix([])
             forcing_rows = sm.Matrix([])
@@ -723,8 +718,9 @@ class System(object):
         self._linear_outputs_forcing_rows = forcing_rows
 
         if self.constraints:
-            self._constraint_idxs = [self._simple_outputs_symbols.index(ci)
-                                     for ci in self._con_syms]
+            self._constraint_idxs = [
+                self._simple_outputs_symbols.index(ci) for ci in
+                self._con_syms]
 
         self.outputs_symbols = output_names_in_order
         self._num_outputs = len(output_names_in_order)
@@ -753,7 +749,7 @@ class System(object):
             raise RuntimeError(msg)
         if len(noncontributing_symbols) != len(self.eom_method._uaux):
             msg = ('You must provide symbols for {} constraint loads that '
-                    'are present in the auxiliary equations.')
+                   'are present in the auxiliary equations.')
             raise ValueError(msg.format(len(self.eom_method._uaux)))
         # TODO : Check that the constraint loads are present in the auxiliary
         # equations and that they are not a coordinate, speed, or specified.
@@ -938,9 +934,9 @@ class System(object):
 
         x = self._initial_conditions_array
         p = self._constants_array
-        dep_guess = [self.initial_conditions[xi]
-                     if xi in self.initial_conditions else 0.0
-                     for xi in dep_vars]
+
+        x0_dict = self._initial_conditions_padded_with_defaults()
+        dep_guess = [x0_dict[xi] for xi in dep_vars]
         dep_idxs = [self.states.index(xi) for xi in dep_vars]
 
         if use_jac:
@@ -979,10 +975,10 @@ class System(object):
             self.initial_conditions[si] = vi
 
     def generate_ode_function(self, **kwargs):
-        """Calls
+        """Returns a function generated from
         :py:func:`~pydy.codegen.ode_function_generators.generate_ode_function`
-        with the appropriate arguments, and sets the ``evaluate_ode_function``
-        attribute to the resulting function.
+        with the appropriate arguments and also sets the
+        ``evaluate_ode_function`` attribute to the resulting function.
 
         Parameters
         ----------
