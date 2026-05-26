@@ -999,7 +999,7 @@ def test_system_with_noncontributing_forces(plot=False):
     ###########################################################################
     # Now change the outputs to a new dictionary and make sure things update.
     ###########################################################################
-    K_, c2, X1, X2 = me.dynamicsymbols('K, c2, X1, X2')
+    K_, c2, X1, X2, a = me.dynamicsymbols('K, c2, X1, X2, a')
     outputs = {
         T_: ke,
         X1: 2*X1 + 4*u1.diff() + 5*u2.diff() - 10,  # check singelton works
@@ -1021,25 +1021,28 @@ def test_system_with_noncontributing_forces(plot=False):
                              6*X1 + 7*X2 + 8*u1.diff() + 9*u2.diff() - 11]),
         c_: constraint,
         (K_, c2): sm.Matrix([ke, constraint]),
+        a: a - u1.diff(),  # trick to return u'
     }
 
     sys.outputs = outputs
     assert sys._needs_code_regeneration
 
-    assert sys._linear_outputs_forcing_rows == sm.Matrix([10, 11])
-    assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2, 3],
-                                                              [8, 9, 6, 7]])
-    assert sys._linear_outputs_symbols == [X1, X2]
-    assert sys._num_linear_outputs == 2
+    assert sys._linear_outputs_forcing_rows == sm.Matrix([10, 11, 0])
+    assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2, 3, 0],
+                                                              [8, 9, 6, 7, 0],
+                                                              [-1, 0, 0, 0, 1]])
+    assert sys._linear_outputs_symbols == [X1, X2, a]
+    assert sys._num_linear_outputs == 3
     assert sys._num_simple_outputs == 4
     assert sys._simple_outputs_matrix == sm.Matrix([ke, constraint, ke,
                                                     constraint])
     assert sys._simple_outputs_symbols == [T_, c_, K_, c2]
-    assert sys.num_outputs == 6
-    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2]
+    assert sys.num_outputs == 7
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2, a]
 
     np.testing.assert_allclose(sys.evaluate_outputs(),
-        [0.0, -9.25, 9.5, -0.9092974268256817, 0.0, -0.9092974268256817])
+        [0.0, -9.25, 9.5, -0.9092974268256817, 0.0, -0.9092974268256817, 0.0],
+                               atol=1e-12)
 
     # Now when constraint loads are added, System will check KanesMethod for
     # any auxilliary equations for the noncontributing forces. These will be
@@ -1052,13 +1055,13 @@ def test_system_with_noncontributing_forces(plot=False):
     sys.noncontributing_symbols = (T1, T2)
     assert sys._needs_code_regeneration
 
-    assert sys._linear_outputs_symbols == [X1, X2, T1, T2]
-    assert sys._num_linear_outputs == 4
+    assert sys._linear_outputs_symbols == [X1, X2, a, T1, T2]
+    assert sys._num_linear_outputs == 5
     assert sys._num_simple_outputs == 4
     assert sys._simple_outputs_matrix == sm.Matrix([ke, constraint, ke,
                                                     constraint])
-    assert sys.num_outputs == 8
-    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2, T1, T2]
+    assert sys.num_outputs == 9
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2, a, T1, T2]
 
     sys.constants = {
         m1: 1.0,
@@ -1082,6 +1085,7 @@ def test_system_with_noncontributing_forces(plot=False):
             -0.8094640101788535,
             0.0,
             -0.8094640101788535,
+            -2.880676,
             28.710670665299798,
             19.044824599932618,
         ])
@@ -1089,11 +1093,11 @@ def test_system_with_noncontributing_forces(plot=False):
     sys.times = np.linspace(0.0, 4.0, num=400)
 
     x_traj = sys.integrate()
-    assert x_traj.shape == (400, 8)  # shouldn't include dummy states?
+    assert x_traj.shape == (400, 9)  # shouldn't include dummy states?
     xdot_traj = sys.evaluate_ode(x=x_traj)
-    assert x_traj.shape == (400, 8)  # shouldn't include dummy states?
+    assert x_traj.shape == (400, 9)  # shouldn't include dummy states?
     y_traj = sys.evaluate_outputs(x=x_traj)
-    assert x_traj.shape == (400, 8)
+    assert x_traj.shape == (400, 9)
 
     rhs = sys.generate_ode_function()
     print(rhs.__doc__)

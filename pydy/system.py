@@ -1294,6 +1294,8 @@ class System(object):
             >>> help(rhs)
 
         """
+        # TODO : convert this to calling evaluate_outputs() and then selecting
+        # the constraint values.
         if self.num_constraints == 0:
             raise ValueError('This system has no constraints.')
 
