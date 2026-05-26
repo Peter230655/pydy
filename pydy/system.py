@@ -344,21 +344,21 @@ class System(object):
         symbols, and values are the floats, arrays of floats, or functions that
         generate the values. If a dictionary value is a function, it must have
         the same signature as ``f(x, t)``, the ode right-hand-side function
-        (see the documentation for the ``ode_solver`` attribute). You needn't
-        provide values for all specified symbols. Those for which you do not
-        give a value will default to 0.0.
+        (see the documentation for the :py:meth:`ode_solver` attribute). You
+        needn't provide values for all specified symbols. Those for which you
+        do not give a value will default to 0.0.
 
         (2) There are two keys: 'symbols' and 'values'. The value for 'symbols'
         is an iterable of *all* the specified quantities in the order that you
         have provided them in 'values'. Values is an ndarray, whose length is
-        `len(sys.specifieds_symbols)`, or a function of x and t that returns an
-        ndarray (also of length `len(sys.specifieds_symbols)`). NOTE: You must
-        provide values for all specified symbols. In this case, we do *not*
-        provide default values.
+        :py:meth:`num_specifieds_symbols`, or a function of x and t that
+        returns an ndarray (also of length :py:meth:`num_specifieds`). NOTE:
+        You must provide values for all specified symbols. In this case, we do
+        *not* provide default values.
 
         NOTE: If you switch formats with the same instance of System, you
-        *must* call `generate_ode_function()` before calling `integrate()`
-        again.
+        *must* call :py:meth:`~pydy.system.System.generate_ode_function` before
+        calling :py:meth:`~pydy.system.System.integrate` again.
 
         Examples
         --------
@@ -479,8 +479,8 @@ class System(object):
     @times.setter
     def times(self, new_times):
         times = np.asarray(new_times)
-        self._check_times(times)
-        self._times = np.asarray(new_times)
+        assert self._check_times(times)
+        self._times = times
 
     def _check_times(self, times):
 
@@ -602,7 +602,7 @@ class System(object):
         the functions and the time derivatives of the states::
 
             outputs[(m1(t), m2(t))] = (m1(t) - 4*m2(t) + k*v(t).diff(t) + 2,
-                                       m1(t) + 3*m2(t) - omega.diff(t))
+                                       m1(t) + 3*m2(t) - omega(t).diff(t))
 
         If equations of the last form are provided, this linear system will be
         numerically solved alongside the ordinary differential equations.
@@ -760,27 +760,28 @@ class System(object):
     @property
     def num_outputs(self):
         """Returns the number of outputs."""
-        self._parse_outputs()  # potentially costly, but may not be up-to-date
         return self._num_outputs
 
     @property
     def noncontributing_forces(self):
-        """List of symbolic functions of time representing the constraint loads
-        (forces & torques) associated with noncontributing loads."""
+        """List of symbolic functions of time representing the noncontributing
+        forces (force & torque measure numbers) associated with auxiliary
+        speeds."""
         return self._noncontributing_forces
 
     @noncontributing_forces.setter
     def noncontributing_forces(self, noncontributing_forces):
         if not hasattr(self.eom_method, 'auxiliary_eqs'):
             msg = ('The KanesMethod object has no auxiliary equations and '
-                   'thus constraint loads cannot be provided.')
+                   'thus noncontributing forces cannot be provided.')
             raise RuntimeError(msg)
         if len(noncontributing_forces) != len(self.eom_method._uaux):
-            msg = ('You must provide symbols for {} constraint loads that '
-                   'are present in the auxiliary equations.')
+            msg = ('You must provide symbols for {} noncontributing forces '
+                   'that are present in the auxiliary equations.')
             raise ValueError(msg.format(len(self.eom_method._uaux)))
-        # TODO : Check that the constraint loads are present in the auxiliary
-        # equations and that they are not a coordinate, speed, or specified.
+        # TODO : Check that the noncontributing force symbols are present in
+        # the auxiliary equations and that they are not a coordinate, speed, or
+        # specified.
         # TODO : What is this check?
         self._noncontributing_forces = list(noncontributing_forces)
         if tuple(noncontributing_forces) in self.outputs:
@@ -1089,7 +1090,7 @@ class System(object):
         self._check_constants(self.constants)
         self._check_specifieds(self.specifieds)
         self._check_initial_conditions(self.initial_conditions)
-        self._check_times(self.times)
+        assert self._check_times(self.times)
 
         if self.evaluate_ode_function is None or self._needs_code_regeneration:
             self.generate_ode_function(**self._last_generated_ode_user_kwargs)
@@ -1116,16 +1117,15 @@ class System(object):
             x = x_default
         x = np.asarray(x)
 
-        # TODO : Maybe the default value of .times shouldn't be empty. Think
-        # about this.
+        # if times has not been set, just use t=0.0
         if t is None:
-            if len(x.shape) == 1:
-                if self.times.size == 0:
+            if len(x.shape) == 1:  # x at t
+                if self.times.size == 0:  # array([])
                     t = 0.0
                 else:
                     t = self.times[0]
             else:
-                if self.times.size == 0:
+                if self.times.size == 0:  # array([])
                     t = np.zeros(x.shape[0])
                 else:
                     t = self.times
@@ -1135,8 +1135,8 @@ class System(object):
     def evaluate_ode(self, x=None, t=None):
         """Returns the right hand side of the differential equations. The
         default is to evaluate at the set initial_conditions at the first time
-        value. Pass in optional arguments to override using the initial state
-        and time.
+        value or with t=0 if :py:meth:`times` is not set. Pass in optional
+        arguments to override using the initial state and time.
 
         Parameters
         ==========
