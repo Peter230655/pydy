@@ -928,22 +928,24 @@ def test_system_with_noncontributing_forces(plot=False):
     )
     kane_with_con.kanes_equations()
 
+    ec = sm.symbols('ec')
     sys = System(
         kane_with_con,
         constants={m1: 1.0, m2: 2.0, l1: 1.0, l2: 2.0, c: 1.0, g: 9.81},
         initial_conditions={q1: 0.1, q2: -0.2, u1: 1.4},
         noncontributing_forces=(T1, T2),
-        outputs={T_: ke},
+        outputs={T_: ec*ke},  # make sure extra constant gets picked up
     )
     sys.set_dependent_initial_conditions()
 
     # TODO : Should the user have access to the dummy symbols for the
     # constraint residuals other than in sys.output_symbols?
     fn = sys._con_syms[0]
+    assert sys.constants_symbols == {m1, m2, l1, l2, c, g, ec}
     assert sys._linear_outputs_symbols == [T1, T2]
     assert sys._num_linear_outputs == 2
     assert sys._num_simple_outputs == 2
-    assert sys._simple_outputs_matrix == sm.Matrix([ke, mot_con])
+    assert sys._simple_outputs_matrix == sm.Matrix([ec*ke, mot_con])
     assert sys._simple_outputs_symbols == [T_, fn]
     assert sys.noncontributing_forces == [T1, T2]
     assert sys.constraints == sm.Matrix([mot_con])

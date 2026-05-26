@@ -164,6 +164,16 @@ class System(object):
                  constants_symbols=None, specifieds_symbols=None):
 
         self._eom_method = eom_method
+        # TODO : What if user adds symbols after constructing a System?
+        if constants_symbols is None:
+            self._constants_symbols = self._Kane_constant_symbols()
+        else:
+            self._constants_symbols = set(constants_symbols)
+        if specifieds_symbols is None:
+            self._specifieds_symbols = self._Kane_undefined_dynamicsymbols()
+        else:
+            self._specifieds_symbols = set(specifieds_symbols)
+
         self._extract_constraints()
 
         self._auxiliaries = []
@@ -186,17 +196,6 @@ class System(object):
             # calls parse_outputs again:
             self.noncontributing_forces = list(noncontributing_forces)
 
-        # TODO : What if user adds symbols after constructing a System?
-        # TODO : Make these tuples instead of sets.
-        # TODO : Search needs to include the output functions.
-        if constants_symbols is None:
-            self._constants_symbols = self._Kane_constant_symbols()
-        else:
-            self._constants_symbols = set(constants_symbols)
-        if specifieds_symbols is None:
-            self._specifieds_symbols = self._Kane_undefined_dynamicsymbols()
-        else:
-            self._specifieds_symbols = set(specifieds_symbols)
 
         if constants is None:
             self.constants = dict()
@@ -623,6 +622,17 @@ class System(object):
     def outputs(self, outputs):
         self._outputs = outputs
         self._parse_outputs()
+        # NOTE : It the output equations are updated they may have new symbols.
+        exprs = []
+        if self._simple_outputs_symbols:
+            exprs += self._simple_outputs_matrix[:]
+        if self._linear_outputs_symbols:
+            exprs += self._linear_outputs_mass_matrix_rows[:]
+            exprs += self._linear_outputs_forcing_rows[:]
+        for s in self._Kane_constant_symbols(exprs=exprs):
+            self._constants_symbols.add(s)
+        for s in self._Kane_undefined_dynamicsymbols(exprs=exprs):
+            self._specifieds_symbols.add(s)
         self._needs_code_regeneration = True
 
     def _parse_outputs(self):
@@ -1464,7 +1474,7 @@ class System(object):
 
         return inlist, insyms
 
-    def _Kane_undefined_dynamicsymbols(self):
+    def _Kane_undefined_dynamicsymbols(self, exprs=None):
         """Similar to ``_find_dynamicsymbols()``, except that it checks all
         syms used in the system. Code is copied from ``linearize()``.
 
@@ -1473,13 +1483,15 @@ class System(object):
 
         """
         from_eoms, from_sym_lists = self._Kane_inlist_insyms()
+        if exprs:
+            from_eoms = exprs
         functions_of_time = set()
         for expr in from_eoms:
             functions_of_time = functions_of_time.union(
                 find_dynamicsymbols(expr))
         return functions_of_time.difference(from_sym_lists)
 
-    def _Kane_constant_symbols(self):
+    def _Kane_constant_symbols(self, exprs=None):
         """Similar to ``_find_othersymbols()``, except it checks all syms used
         in the system.
 
@@ -1489,6 +1501,8 @@ class System(object):
 
         """
         from_eoms, from_sym_lists = self._Kane_inlist_insyms()
+        if exprs:
+            from_eoms = exprs
         unique_symbols = set()
         for expr in from_eoms:
             unique_symbols = unique_symbols.union(expr.free_symbols)
