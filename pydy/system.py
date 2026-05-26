@@ -144,7 +144,7 @@ class System(object):
         Expressions that are linear in the functions of time and/or the time
         derivatives of the speeds are also supported, but not yet nonlinear
         functions of these variables.
-    noncontributing_symbols : iterable of Functions of time, optional
+    noncontributing_forces : iterable of Functions of time, optional
         If the ``eom_method`` includes noncontributig forces (Kane's method),
         provide a list of variable names for these forces and they will be
         computed when evaluating the differential equations.
@@ -160,7 +160,7 @@ class System(object):
     """
     def __init__(self, eom_method, constants=None, specifieds=None,
                  ode_solver=None, initial_conditions=None, times=None,
-                 outputs=None, noncontributing_symbols=None,
+                 outputs=None, noncontributing_forces=None,
                  constants_symbols=None, specifieds_symbols=None):
 
         self._eom_method = eom_method
@@ -180,11 +180,11 @@ class System(object):
 
         # NOTE: must be set before the state variables are intialized, so do
         # this first
-        if noncontributing_symbols is None:
-            self._noncontributing_symbols = []
+        if noncontributing_forces is None:
+            self._noncontributing_forces = []
         else:
             # calls parse_outputs again:
-            self.noncontributing_symbols = list(noncontributing_symbols)
+            self.noncontributing_forces = list(noncontributing_forces)
 
         # TODO : What if user adds symbols after constructing a System?
         # TODO : Make these tuples instead of sets.
@@ -754,29 +754,29 @@ class System(object):
         return self._num_outputs
 
     @property
-    def noncontributing_symbols(self):
+    def noncontributing_forces(self):
         """List of symbolic functions of time representing the constraint loads
         (forces & torques) associated with noncontributing loads."""
-        return self._noncontributing_symbols
+        return self._noncontributing_forces
 
-    @noncontributing_symbols.setter
-    def noncontributing_symbols(self, noncontributing_symbols):
+    @noncontributing_forces.setter
+    def noncontributing_forces(self, noncontributing_forces):
         if not hasattr(self.eom_method, 'auxiliary_eqs'):
             msg = ('The KanesMethod object has no auxiliary equations and '
                    'thus constraint loads cannot be provided.')
             raise RuntimeError(msg)
-        if len(noncontributing_symbols) != len(self.eom_method._uaux):
+        if len(noncontributing_forces) != len(self.eom_method._uaux):
             msg = ('You must provide symbols for {} constraint loads that '
                    'are present in the auxiliary equations.')
             raise ValueError(msg.format(len(self.eom_method._uaux)))
         # TODO : Check that the constraint loads are present in the auxiliary
         # equations and that they are not a coordinate, speed, or specified.
         # TODO : What is this check?
-        self._noncontributing_symbols = list(noncontributing_symbols)
-        if tuple(noncontributing_symbols) in self.outputs:
+        self._noncontributing_forces = list(noncontributing_forces)
+        if tuple(noncontributing_forces) in self.outputs:
             raise ValueError('Constraint loads already present in outputs.')
 
-        non_syms = tuple(noncontributing_symbols)
+        non_syms = tuple(noncontributing_forces)
         self.outputs[non_syms] = self.eom_method.auxiliary_eqs
         self._parse_outputs()
         self._needs_code_regeneration = True

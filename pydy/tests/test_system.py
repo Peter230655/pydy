@@ -55,7 +55,7 @@ class TestSystem():
         assert sys.eom_method is self.kane
         assert sys.evaluate_ode_function is None
         assert sys.initial_conditions == dict()
-        assert sys.noncontributing_symbols == []
+        assert sys.noncontributing_forces == []
         assert sys.num_auxiliaries == 0
         assert sys.num_config_constraints == 0
         assert sys.num_constants == 4
@@ -862,7 +862,7 @@ def test_system_with_noncontributing_forces(plot=False):
     # Check that the system will correctly build with automatic parsing of the
     # auxiliary equations.
     ###########################################################################
-    sys = System(kane, noncontributing_symbols=(T1, T2))
+    sys = System(kane, noncontributing_forces=(T1, T2))
     assert sys._linear_idxs == [0, 1]
     assert sys._linear_outputs_symbols == [T1, T2]
     assert sys._num_linear_outputs == 2
@@ -871,7 +871,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._simple_outputs_symbols == []
     assert sys.auxiliaries == [int_T1, int_T2]
     assert sys.constants_symbols == {m1, m2, l1, l2, c, g}
-    assert sys.noncontributing_symbols == [T1, T2]
+    assert sys.noncontributing_forces == [T1, T2]
     assert sys.constraints == sm.Matrix([])
     assert sys.coordinates == [q1, q2]
     assert sys.num_constraints == 0
@@ -932,7 +932,7 @@ def test_system_with_noncontributing_forces(plot=False):
         kane_with_con,
         constants={m1: 1.0, m2: 2.0, l1: 1.0, l2: 2.0, c: 1.0, g: 9.81},
         initial_conditions={q1: 0.1, q2: -0.2, u1: 1.4},
-        noncontributing_symbols=(T1, T2),
+        noncontributing_forces=(T1, T2),
         outputs={T_: ke},
     )
     sys.set_dependent_initial_conditions()
@@ -945,7 +945,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._num_simple_outputs == 2
     assert sys._simple_outputs_matrix == sm.Matrix([ke, mot_con])
     assert sys._simple_outputs_symbols == [T_, fn]
-    assert sys.noncontributing_symbols == [T1, T2]
+    assert sys.noncontributing_forces == [T1, T2]
     assert sys.constraints == sm.Matrix([mot_con])
     assert sys.num_config_constraints == 0
     assert sys.num_constraints == 1
@@ -982,7 +982,7 @@ def test_system_with_noncontributing_forces(plot=False):
     assert sys._simple_idxs == [0, 1]
     assert sys._simple_outputs_symbols == [T_, c_]
     assert sys.auxiliaries == []
-    assert sys.noncontributing_symbols == []
+    assert sys.noncontributing_forces == []
     assert sys.constraints == sm.Matrix([])
     assert sys.num_constraints == 0
     assert sys.num_outputs == 2
@@ -1058,9 +1058,9 @@ def test_system_with_noncontributing_forces(plot=False):
     # of constraint load symbols and they have to be present in the auxiliary
     # equations.
     with pytest.raises(ValueError):  # too many symbols
-        sys.noncontributing_symbols = (T1, T2, u1)
+        sys.noncontributing_forces = (T1, T2, u1)
 
-    sys.noncontributing_symbols = (T1, T2)
+    sys.noncontributing_forces = (T1, T2)
     assert sys._needs_code_regeneration
 
     assert sys._linear_outputs_symbols == [X1, X2, a, T1, T2]
