@@ -73,6 +73,14 @@ class TestSystem():
         assert sys.states == list(me.dynamicsymbols('x0, v0'))
         np.testing.assert_allclose(sys.times, np.array([]))
 
+        # Set constants and specified symbols manually
+        # --------------------------------------------
+        sys = System(self.kane,
+                     constants_symbols=sm.symbols('k0, m0, g, c0'),
+                     specifieds_symbols=(self.specified_symbol,))
+        assert sys.constants_symbols == set(sm.symbols('k0, m0, g, c0'))
+        assert sys.specifieds_symbols == {self.specified_symbol}
+
         # Specify a bunch of attributes during construction.
         # --------------------------------------------------
         ic = {me.dynamicsymbols('x0'): 3.6, me.dynamicsymbols('v0'): 4.3}
