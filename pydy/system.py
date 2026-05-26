@@ -123,8 +123,8 @@ class System(object):
         :external+sympy:py:meth:`~sympy.physics.mechanics.kane.KanesMethod.kanes_equations`
         *before* constructing this system.
     constants : dict, optional (default: all 1.0)
-        This dictionary maps SymPy :external+sympy:py:class:`~Symbol` objects
-        to floats.
+        This dictionary maps SymPy :external+sympy:py:class:`~sympy.Symbol`
+        objects to floats.
     specifieds : dict, optional (default: all 0.0)
         This dictionary maps SymPy Functions of time objects, or tuples of
         them, to floats, NumPy arrays, or functions of the state and time.
@@ -286,8 +286,8 @@ class System(object):
     @property
     def eom_method(self):
         """This is a
-        :external+sympy:py:class:`~sympy.physics.mechanics.KanesMethod`. The
-        method used to generate the equations of motion. Read-only."""
+        :external+sympy:py:class:`~sympy.physics.mechanics.kane.KanesMethod`.
+        The method used to generate the equations of motion. Read-only."""
         return self._eom_method
 
     @property
@@ -939,7 +939,7 @@ class System(object):
             solve the constraint equations for the dependent states.
         root_kwargs
             Extra keyword arguments that are passed to
-            :external+scipy:py:func`scipy.optimize.root`.
+            :external+scipy:py:func:`scipy.optimize.root`.
 
         """
         # TODO : The nonholonomic constraints can be solved analytically, root
