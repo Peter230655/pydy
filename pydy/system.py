@@ -135,9 +135,9 @@ is generated, you must call
             Either a dictionary that maps the constants symbols to their numerical
             values or an array with the constants in the following order:
                 - g
+                - l0
                 - m0
                 - m1
-                - l0
     <BLANKLINE>
         Returns
         =======
