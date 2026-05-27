@@ -118,19 +118,19 @@ class System(object):
 
     Parameters
     ----------
-    eom_method : sympy.physics.mechanics.KanesMethod
+    eom_method : sympy.physics.mechanics.kane.KanesMethod
         You must have called
         :external+sympy:py:meth:`~sympy.physics.mechanics.kane.KanesMethod.kanes_equations`
         *before* constructing this system.
     constants : dict, optional (default: all 1.0)
-        This dictionary maps SymPy :external+sympy:py:class:`~sympy.Symbol`
-        objects to floats.
+        This dictionary maps SymPy
+        :external+sympy:py:class:`~sympy.cor.symbol.Symbol` objects to floats.
     specifieds : dict, optional (default: all 0.0)
         This dictionary maps SymPy Functions of time objects, or tuples of
         them, to floats, NumPy arrays, or functions of the state and time.
     ode_solver : function, optional
         This function computes the derivatives of the states. The default is
-        :external+scipy:py:class:`scipy.integrate.odeint`.
+        :external+scipy:py:func:`scipy.integrate.odeint`.
     initial_conditions : dict, optional (default: all zero)
         This dictionary maps SymPy Functions of time objects to floats.
     times : array_like, shape(n,), optional
@@ -351,10 +351,10 @@ class System(object):
         (2) There are two keys: 'symbols' and 'values'. The value for 'symbols'
         is an iterable of *all* the specified quantities in the order that you
         have provided them in 'values'. Values is an ndarray, whose length is
-        :py:meth:`num_specifieds_symbols`, or a function of x and t that
-        returns an ndarray (also of length :py:meth:`num_specifieds`). NOTE:
-        You must provide values for all specified symbols. In this case, we do
-        *not* provide default values.
+        :py:meth:`num_specifieds`, or a function of x and t that returns an
+        ndarray (also of length :py:meth:`num_specifieds`). NOTE: You must
+        provide values for all specified symbols. In this case, we do *not*
+        provide default values.
 
         NOTE: If you switch formats with the same instance of System, you
         *must* call :py:meth:`~pydy.system.System.generate_ode_function` before
@@ -912,7 +912,8 @@ class System(object):
     @property
     def constraints(self):
         """A column matrix of configuration and motion constraints expressions,
-        ordered as stored in KanesMethod."""
+        ordered as stored in
+        :external+sympy:py:class:~sympy.physics.mechanics.kane.KanesMethod."""
         constraints = sm.Matrix([])
 
         if self.config_constraints or self.motion_constraints:
@@ -1404,20 +1405,23 @@ class System(object):
             return con[:, self.num_config_constraints:]
 
     def integrate(self, **solver_kwargs):
-        """Integrates the equations ``evaluate_ode_function()`` using
-        ``ode_solver``.
+        """Integrates the equations
+        :py:meth:`~pydy.system.System.evaluate_ode_function` using
+        :py:meth:`~pydy.system.System.ode_solver`.
 
         It is necessary to have first generated an ode function. If you have
         not done so, we do so automatically by invoking
-        ``generate_ode_function()``. However, if you want to customize how this
-        function is generated (e.g., change the generator to cython), you can
-        call ``generate_ode_function()`` on your own (before calling
-        ``integrate()``).
+        :py:meth:`~pydy.system.System.generate_ode_function`. However, if you
+        want to customize how this function is generated (e.g., change the
+        generator to cython), you can call
+        :py:meth:`~pydy.system.System.generate_ode_function` on your own
+        (before calling :py:meth:`~pydy.system.System.integrate`).
 
         Parameters
         ----------
         **solver_kwargs
-            Optional arguments that are passed on to the ``ode_solver``.
+            Optional arguments that are passed on to the
+            :py:meth:`~pydy.system.System.ode_solver`.
 
         Returns
         -------
@@ -1425,7 +1429,7 @@ class System(object):
             The trajectory of states (coordinates and speeds) through the
             requested time interval. num_integrator_time_steps is either
             len(times) if len(times) > 2, or is determined by the
-            ``ode_solver``.
+            :py:meth:`~pydy.system.System.ode_solver`.
 
         """
         if len(self.times) < 2:
