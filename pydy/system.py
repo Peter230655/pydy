@@ -82,8 +82,10 @@ function for you behind the scenes. If you want to customize how this function
 is generated, you must call
 :py:meth:`~pydy.system.System.generate_ode_function` on your own::
 
-    >>> _ = sys.generate_ode_function(generator='cython')
-    >>> help(sys.evaluate_ode_function)  # doctest: +SKIP
+    >>> rhs = sys.generate_ode_function(generator='cython')
+    >>> sys.evaluate_ode_function == rhs
+    True
+    >>> help(sys.evaluate_ode_function)
     Help on function rhs in module pydy.codegen.ode_function_generators:
     <BLANKLINE>
     rhs(*args)
@@ -132,9 +134,9 @@ is generated, you must call
         p : dictionary len(4) or ndarray shape(4,)
             Either a dictionary that maps the constants symbols to their numerical
             values or an array with the constants in the following order:
-                - m1
                 - g
                 - m0
+                - m1
                 - l0
     <BLANKLINE>
         Returns
@@ -860,7 +862,7 @@ class System(object):
         :py:func:`~pydy.codegen.ode_function_generators.generate_ode_function`
         that computes the state derivatives::
 
-            x' = evaluate_ode_function(x, t, *args)
+            xd = evaluate_ode_function(x, t, *args)
 
         This function is used by the :py:meth:`~pydy.system.System.ode_solver`.
 
@@ -895,7 +897,7 @@ class System(object):
         args = (forcing,
                 self.coordinates,
                 speeds,
-                self.constants_symbols)
+                list(sm.ordered(self.constants_symbols)))
 
         return args
 
@@ -1210,7 +1212,7 @@ class System(object):
 
         Returns
         =======
-        x_dot : ndarray, shape(n,) or shape(m, n)
+        xd : ndarray, shape(n,) or shape(m, n)
            Time derivative of the states at time t.
 
         Notes
@@ -1249,14 +1251,14 @@ class System(object):
                 raise ValueError('t must be array with the same length as x.')
             if x.shape[0] != len(t):
                 raise ValueError('x trajectory must have same length as t.')
-            xdot = np.zeros_like(x)
+            xd = np.zeros_like(x)
             for i, (ti, xi) in enumerate(zip(t, x)):
                 res = self.evaluate_ode_function(xi, ti, *args)
                 if self._simple_outputs_symbols:
-                    xdot[i, :] = res[0]
+                    xd[i, :] = res[0]
                 else:
-                    xdot[i, :] = res
-            return xdot
+                    xd[i, :] = res
+            return xd
 
     def evaluate_outputs(self, x=None, t=None):
         """Returns an array of the evaluated outputs. The default is to
