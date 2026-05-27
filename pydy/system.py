@@ -227,6 +227,8 @@ class System(object):
                  outputs=None, noncontributing_forces=None,
                  constants_symbols=None, specifieds_symbols=None):
 
+        self._last_generated_ode_user_kwargs = {}
+
         self._eom_method = eom_method
         # TODO : What if user adds symbols after constructing a System?
         if constants_symbols is None:
@@ -260,7 +262,6 @@ class System(object):
             # calls parse_outputs again:
             self.noncontributing_forces = list(noncontributing_forces)
 
-
         if constants is None:
             self.constants = dict()
         else:
@@ -287,9 +288,7 @@ class System(object):
             self.times = times
 
         self._evaluate_ode_function = None
-
         self._needs_code_regeneration = True
-        self._last_generated_ode_user_kwargs = {}
 
     @property
     def coordinates(self):
