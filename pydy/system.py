@@ -615,6 +615,14 @@ class System(object):
             raise ValueError(msg.format(ode_solver))
         self._ode_solver = ode_solver
 
+        # NOTE : This ensures that force_c_contiguous will be set to True if a
+        # cutom integrator is added and you last generated a cython based ode
+        # function.
+        if 'generator' in self._last_generated_ode_user_kwargs:
+            if (self._last_generated_ode_user_kwargs['generator'] == 'cython'
+                    and ode_solver is not odeint):
+                self._needs_code_regeneration = True
+
     @property
     def initial_conditions(self):
         """Initial conditions for all states (coordinates and speeds). Keys
