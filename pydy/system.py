@@ -82,7 +82,69 @@ function for you behind the scenes. If you want to customize how this function
 is generated, you must call
 :py:meth:`~pydy.system.System.generate_ode_function` on your own::
 
-    >>> sys.generate_ode_function(generator='cython')
+    >>> _ = sys.generate_ode_function(generator='cython')
+    >>> help(sys.evaluate_ode_function)  # doctest: +SKIP
+    Help on function rhs in module pydy.codegen.ode_function_generators:
+    <BLANKLINE>
+    rhs(*args)
+        Returns the derivatives of the states, i.e. numerically evaluates the right
+        hand side of the first order differential equation.
+    <BLANKLINE>
+        x' = f(x, t, r, p)
+    <BLANKLINE>
+        Parameters
+        ==========
+        x : ndarray, shape(4,)
+            The state vector is ordered as such:
+                - q0(t)
+                - q1(t)
+                - u0(t)
+                - u1(t)
+        t : float
+            The current time.
+        r : dictionary; ndarray, shape(1,); function
+    <BLANKLINE>
+            There are three options for this argument. (1) is more flexible but
+            (2) and (3) are much more efficient.
+    <BLANKLINE>
+            (1) A dictionary that maps the specified functions of time to floats,
+            ndarrays, or functions that produce ndarrays. The keys can be a single
+            specified symbolic function of time or a tuple of symbols. The total
+            number of symbols must be equal to 1. If the value is a
+            function it must be of the form g(x, t), where x is the current state
+            vector ndarray and t is the current time float and it must return an
+            ndarray of the correct shape. For example::
+    <BLANKLINE>
+              r = {a: 1.0,
+                   (d, b) : np.array([1.0, 2.0]),
+                   (e, f) : lambda x, t: np.array(x[0], x[1]),
+                   c: lambda x, t: np.array(x[2])}
+    <BLANKLINE>
+            (2) A ndarray with the specified values in the correct order and of the
+            correct shape.
+    <BLANKLINE>
+            (3) A function that must be of the form g(x, t), where x is the current
+            state vector and t is the current time and it must return an ndarray of
+            the correct shape.
+    <BLANKLINE>
+            The specified inputs are, in order:
+                - F(t)
+        p : dictionary len(4) or ndarray shape(4,)
+            Either a dictionary that maps the constants symbols to their numerical
+            values or an array with the constants in the following order:
+                - m1
+                - g
+                - m0
+                - l0
+    <BLANKLINE>
+        Returns
+        =======
+        dx : ndarray, shape(4,)
+            The derivative of the state vector.
+        y : ndarray, shape(1,)
+            Values of the provided outputs.
+                - y0(t)
+
     >>> sys.integrate()
     array([[ 0.        ,  0.5       ,  0.        ,  0.        ],
            [-0.31425675,  3.29123866, -1.33612873,  2.70246056],
@@ -1161,13 +1223,13 @@ class System(object):
 
         To see the order of the state values use::
 
-            >>> system = System(...)
-            >>> system.states
+            system = System(...)
+            system.states
 
         or::
 
-            >>> rhs = system.generate_ode_function()
-            >>> help(rhs)
+            rhs = system.generate_ode_function()
+            help(rhs)
 
         """
         x, t, args = self._prep_x_t_overrides(x, t)
@@ -1223,13 +1285,13 @@ class System(object):
 
         To see the order of the state values use::
 
-            >>> system = System(...)
-            >>> system.states
+            system = System(...)
+            system.states
 
         or::
 
-            >>> rhs = system.generate_ode_function()
-            >>> help(rhs)
+            rhs = system.generate_ode_function()
+            help(rhs)
 
         """
         if not self.outputs:
@@ -1296,13 +1358,13 @@ class System(object):
 
         To see the order of the state values use::
 
-            >>> system = System(...)
-            >>> system.states
+            system = System(...)
+            system.states
 
         or::
 
-            >>> rhs = system.generate_ode_function()
-            >>> help(rhs)
+            rhs = system.generate_ode_function()
+            help(rhs)
 
         """
         # TODO : convert this to calling evaluate_outputs() and then selecting
@@ -1348,13 +1410,13 @@ class System(object):
 
         To see the order of the state values use::
 
-            >>> system = System(...)
-            >>> system.states
+            system = System(...)
+            system.states
 
         or::
 
-            >>> rhs = system.generate_ode_function()
-            >>> help(rhs)
+            rhs = system.generate_ode_function()
+            help(rhs)
 
         """
         if self.num_config_constraints == 0:
@@ -1387,13 +1449,13 @@ class System(object):
 
         To see the order of the state values use::
 
-            >>> system = System(...)
-            >>> system.states
+            system = System(...)
+            system.states
 
         or::
 
-            >>> rhs = system.generate_ode_function()
-            >>> help(rhs)
+            rhs = system.generate_ode_function()
+            help(rhs)
 
         """
         if self.num_motion_constraints == 0:
