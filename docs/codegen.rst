@@ -154,9 +154,10 @@ Additional output equations can also be simulatenously evaluated:
    (array([ 2., -3.]), array([4.]))
 
 Furthermore, for direct control over evaluating matrices you can use
-``lambdify`` in SymPy or utilize the
-:py:class:`~pydy.codegen.cython_code.CythonMatrixGenerator` class in PyDy. For
-example, this shows you how to generate C and Cython code to evaluate matrices:
+:external+sympy:py:func:`~sympy.utilities.lambdify.lambdify` in SymPy or
+utilize the :py:class:`~pydy.codegen.cython_code.CythonMatrixGenerator` class
+in PyDy. For example, this shows you how to generate C and Cython code to
+evaluate matrices:
 
 .. code:: pycon
 
