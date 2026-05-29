@@ -47,17 +47,39 @@ class TestSystem():
         # -----------------------------------
         sys = System(self.kane)
 
-        assert (sys.constants_symbols ==
-                set(sm.symbols('k0, m0, g, c0')))
-        assert sys.specifieds_symbols == {self.specified_symbol}
-        assert sys.states == me.dynamicsymbols('x0, v0')
-        assert sys.evaluate_ode_function is None
+        assert sys.auxiliaries == []
+        assert sys.constants == dict()
+        assert sys.constants_symbols == set(sm.symbols('k0, m0, g, c0'))
+        assert sys.constraints == sm.Matrix([])
+        assert sys.coordinates == [me.dynamicsymbols('x0')]
         assert sys.eom_method is self.kane
+        assert sys.evaluate_ode_function is None
+        assert sys.initial_conditions == dict()
+        assert sys.noncontributing_forces == []
+        assert sys.num_auxiliaries == 0
+        assert sys.num_config_constraints == 0
+        assert sys.num_constants == 4
+        assert sys.num_constraints == 0
+        assert sys.num_coordinates == 1
+        assert sys.num_motion_constraints == 0
+        assert sys.num_outputs == 0
+        assert sys.num_specifieds == 1
+        assert sys.num_speeds == 1
+        assert sys.num_states == 2
         assert sys.ode_solver is odeint
         assert sys.specifieds == dict()
-        assert sys.initial_conditions == dict()
-        assert sys.constants == dict()
+        assert sys.specifieds_symbols == {self.specified_symbol}
+        assert sys.speeds == [me.dynamicsymbols('v0')]
+        assert sys.states == list(me.dynamicsymbols('x0, v0'))
         np.testing.assert_allclose(sys.times, np.array([]))
+
+        # Set constants and specified symbols manually
+        # --------------------------------------------
+        sys = System(self.kane,
+                     constants_symbols=sm.symbols('k0, m0, g, c0'),
+                     specifieds_symbols=(self.specified_symbol,))
+        assert sys.constants_symbols == set(sm.symbols('k0, m0, g, c0'))
+        assert sys.specifieds_symbols == {self.specified_symbol}
 
         # Specify a bunch of attributes during construction.
         # --------------------------------------------------
@@ -554,6 +576,7 @@ def test_specifying_coordinate_issue_339():
 
     sys.integrate()
 
+
 def test_system_with_constraints(plot=False):
     """Rolling disc. Start with disc suspended above a ground plane. Use a
     holonomic constraint to keep it rolling on the ground plane. Add no-slip
@@ -653,8 +676,7 @@ def test_system_with_constraints(plot=False):
         u6: speed/sys.constants[r],
     }
 
-    with pytest.raises(ValueError):  # times array not set
-        xdot0 = sys.evaluate_ode()
+    xdot0 = sys.evaluate_ode()  # assumes t = 0.0
 
     sys.times = np.array([1.0, 2.0])
 
@@ -784,4 +806,334 @@ def test_system_with_constraints(plot=False):
 
         plt.show()
 
-    return sys
+
+def test_system_with_noncontributing_forces(plot=False):
+
+    ###########################################################################
+    # Define the symbolic dynamics: double simple pendulum with damping and
+    # noncontributing tension forces exposed, based on:
+    # https://moorepants.github.io/learn-multibody-dynamics/noncontributing.html
+    ###########################################################################
+    m1, m2, l1, l2, c, g = sm.symbols('m1, m2, l1, l2, c, g')
+    q1, q2, u1, u2 = me.dynamicsymbols('q1, q2, u1, u2')
+    u3, u4, T1, T2 = me.dynamicsymbols('u3, u4, T1, T2')
+    # TODO : Should these be dynamicsymbols to be consistent?
+    int_T1, int_T2 = sm.Symbol('∫ T1 dt'), sm.Symbol('∫ T2 dt')
+
+    N, A, B = sm.symbols('N, A, B', cls=me.ReferenceFrame)
+
+    A.orient_axis(N, q1, N.z)
+    B.orient_axis(N, q2, N.z)
+    A.set_ang_vel(N, u1*N.z)
+    B.set_ang_vel(N, u2*N.z)
+
+    O_ = me.Point('O')
+    P1 = O_.locatenew('P1', -l1*A.y)
+    P2 = P1.locatenew('P2', -l2*B.y)
+
+    O_.set_vel(N, 0)
+    P1.v2pt_theory(O_, N, A)
+    P1.set_vel(N, P1.vel(N) - u3*A.y)
+    P2.v2pt_theory(P1, N, B)
+    P2.set_vel(N, P2.vel(N) - u4*B.y)
+
+    bob1 = me.Particle('bob1', P1, m1)
+    bob2 = me.Particle('bob2', P2, m2)
+
+    loads = (
+        (P1, -m1*g*N.y + T1*A.y - T2*B.y),
+        (P2, -m2*g*N.y + T2*B.y),
+        (A, -c*u1*N.z + c*(u2 - u1)*N.z),
+        (B, - c*(u2 - u1)*N.z),
+    )
+
+    kane = me.KanesMethod(
+        N,
+        (q1, q2),
+        (u1, u2),
+        kd_eqs=[q1.diff() - u1, q2.diff() - u2],
+        bodies=(bob1, bob2),
+        forcelist=loads,
+        u_auxiliary=(u3, u4),
+    )
+    kane.kanes_equations()
+
+    ###########################################################################
+    # Check that the system will correctly build with automatic parsing of the
+    # auxiliary equations.
+    ###########################################################################
+    sys = System(kane, noncontributing_forces=(T1, T2))
+    assert sys._linear_idxs == [0, 1]
+    assert sys._linear_outputs_symbols == [T1, T2]
+    assert sys._num_linear_outputs == 2
+    assert sys._num_simple_outputs == 0
+    assert sys._simple_idxs == []
+    assert sys._simple_outputs_symbols == []
+    assert sys.auxiliaries == [int_T1, int_T2]
+    assert sys.constants_symbols == {m1, m2, l1, l2, c, g}
+    assert sys.noncontributing_forces == [T1, T2]
+    assert sys.constraints == sm.Matrix([])
+    assert sys.coordinates == [q1, q2]
+    assert sys.num_constraints == 0
+    assert sys.num_outputs == 2
+    assert sys.outputs == {(T1, T2): kane.auxiliary_eqs}
+    assert sys.outputs_symbols == [T1, T2]
+    assert sys.speeds == [u1, u2]
+    assert sys.states == [q1, q2, u1, u2, int_T1, int_T2]
+    with pytest.raises(ValueError):
+        sys.set_dependent_initial_conditions()
+    np.testing.assert_allclose(sys.evaluate_outputs(), [2.0, 1.0])
+    # TODO : If you haven't provided times it assumes time is always zero. Is
+    # this a good idea?
+    np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6))),
+                               np.array([[2.0, 1.0], [2.0, 1.0], [2.0, 1.0]]))
+    np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6)),
+                                                    t=[1.0, 2.0, 3.0]),
+                               np.array([[2.0, 1.0], [2.0, 1.0], [2.0, 1.0]]))
+    with pytest.raises(ValueError):  # time should be a float
+        np.testing.assert_allclose(sys.evaluate_outputs(t=[1.0, 2.0, 3.0]),
+                                   np.array([[2.0, 1.0], [2.0, 1.0],
+                                             [2.0, 1.0]]))
+    with pytest.raises(ValueError):  # time should be an array
+        np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6)),
+                                                        t=2.0),
+                                   np.array([[2.0, 1.0], [2.0, 1.0],
+                                             [2.0, 1.0]]))
+    with pytest.raises(ValueError):  # x.shape[0] must equal len(t)
+        np.testing.assert_allclose(sys.evaluate_outputs(x=np.zeros((3, 6)),
+                                                        t=[1.0, 2.0]),
+                                   np.array([[2.0, 1.0], [2.0, 1.0],
+                                             [2.0, 1.0]]))
+
+    ###########################################################################
+    # Check a system with both constraints and noncontributing forces
+    ###########################################################################
+    # TODO : If u3 and u4 are not replaced here, equations of motion contain
+    # derivatives of u3 and u4. Maybe KanesMethod should to this substitution
+    # internally.
+    T_ = me.dynamicsymbols('T')
+    ke = (m1/2*P1.vel(N).dot(P1.vel(N)) +
+          m2/2*P2.vel(N).dot(P2.vel(N))).xreplace({u3: 0, u4: 0})
+    mot_con = P2.vel(N).dot(B.x).xreplace({u3: 0, u4: 0})
+    kane_with_con = me.KanesMethod(
+        N,
+        (q1, q2),
+        (u1,),
+        kd_eqs=[q1.diff() - u1, q2.diff() - u2],
+        u_dependent=(u2,),
+        velocity_constraints=[mot_con],
+        bodies=(bob1, bob2),
+        forcelist=loads,
+        u_auxiliary=(u3, u4),
+    )
+    kane_with_con.kanes_equations()
+
+    ec = sm.symbols('ec')
+    sys = System(
+        kane_with_con,
+        constants={m1: 1.0, m2: 2.0, l1: 1.0, l2: 2.0, c: 1.0, g: 9.81},
+        initial_conditions={q1: 0.1, q2: -0.2, u1: 1.4},
+        noncontributing_forces=(T1, T2),
+        outputs={T_: ec*ke},  # make sure extra constant gets picked up
+    )
+    sys.set_dependent_initial_conditions()
+
+    # TODO : Should the user have access to the dummy symbols for the
+    # constraint residuals other than in sys.output_symbols?
+    fn = sys._con_syms[0]
+    assert sys.constants_symbols == {m1, m2, l1, l2, c, g, ec}
+    assert sys._linear_outputs_symbols == [T1, T2]
+    assert sys._num_linear_outputs == 2
+    assert sys._num_simple_outputs == 2
+    assert sys._simple_outputs_matrix == sm.Matrix([ec*ke, mot_con])
+    assert sys._simple_outputs_symbols == [T_, fn]
+    assert sys.noncontributing_forces == [T1, T2]
+    assert sys.constraints == sm.Matrix([mot_con])
+    assert sys.num_config_constraints == 0
+    assert sys.num_constraints == 1
+    assert sys.num_motion_constraints == 1
+    assert sys.num_outputs == 4
+    assert sys.outputs_symbols == [T_, fn, T1, T2]
+
+    np.testing.assert_allclose(sys.evaluate_ode(),
+        [1.4, -0.6687355423879242, -10.857684528809608, 5.614318317403088,
+         30.235328069913542, 18.345324])
+
+    np.testing.assert_allclose(sys.evaluate_outputs(),
+        [1.151171,  0.0, 30.235328, 18.345324])
+
+    np.testing.assert_allclose(sys.evaluate_motion_constraints(), [0.0])
+    np.testing.assert_allclose(sys.evaluate_constraints(), [0.0])
+    with pytest.raises(ValueError):
+        sys.evaluate_config_constraints()
+
+    ###########################################################################
+    # Check that the system will skip automatic parsing of the auxiliary
+    # equations and only handle additional simple outputs passed into __init__.
+    ###########################################################################
+    c_ = me.dynamicsymbols('c')
+    constraint = P2.pos_from(O_).dot(N.x) - sm.sin(2)
+    outputs = {T_: ke, c_: constraint}
+
+    sys = System(kane, outputs=outputs)
+
+    assert sys._linear_idxs == []
+    assert sys._linear_outputs_symbols == []
+    assert sys._num_linear_outputs == 0
+    assert sys._num_simple_outputs == 2
+    assert sys._simple_idxs == [0, 1]
+    assert sys._simple_outputs_symbols == [T_, c_]
+    assert sys.auxiliaries == []
+    assert sys.noncontributing_forces == []
+    assert sys.constraints == sm.Matrix([])
+    assert sys.num_constraints == 0
+    assert sys.num_outputs == 2
+    assert sys.outputs == {T_: ke, c_: constraint}
+    assert sys.outputs_symbols == [T_, c_]
+    assert sys.states == [q1, q2, u1, u2]
+    with pytest.raises(ValueError):
+        sys.evaluate_constraints()
+    with pytest.raises(ValueError):
+        sys.evaluate_config_constraints()
+    with pytest.raises(ValueError):
+        sys.evaluate_motion_constraints()
+    np.testing.assert_allclose(sys.evaluate_ode(),
+                               [0.0, 0.0, 0.0, 0.0])
+    np.testing.assert_allclose(sys.evaluate_outputs(),
+                               [0.0, -0.9092974268256817])
+
+    # cannot have duplicate output names
+    with pytest.raises(ValueError):
+        sys.outputs = {T_: ke, (T_, c_): (ke, constraint)}
+
+    ###########################################################################
+    # Now change the outputs to a new dictionary and make sure things update.
+    ###########################################################################
+    K_, c2, X1, X2, a = me.dynamicsymbols('K, c2, X1, X2, a')
+    outputs = {
+        T_: ke,
+        X1: 2*X1 + 4*u1.diff() + 5*u2.diff() - 10,  # check singelton works
+        c_: constraint,
+        (K_, c2): [ke, constraint],
+    }
+
+    sys.outputs = outputs
+    assert sys._needs_code_regeneration
+
+    assert sys._linear_outputs_forcing_rows == sm.Matrix([10])
+    assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2]])
+    assert sys._linear_outputs_symbols == [X1]
+    assert sys._num_linear_outputs == 1
+
+    outputs = {
+        T_: ke,
+        (X1, X2): sm.Matrix([2*X1 + 3*X2 + 4*u1.diff() + 5*u2.diff() - 10,
+                             6*X1 + 7*X2 + 8*u1.diff() + 9*u2.diff() - 11]),
+        c_: constraint,
+        (K_, c2): sm.Matrix([ke, constraint]),
+        a: a - u1.diff(),  # trick to return u'
+    }
+
+    sys.outputs = outputs
+    assert sys._needs_code_regeneration
+
+    assert sys._linear_outputs_forcing_rows == sm.Matrix([10, 11, 0])
+    assert sys._linear_outputs_mass_matrix_rows == sm.Matrix([[4, 5, 2, 3, 0],
+                                                              [8, 9, 6, 7, 0],
+                                                              [-1, 0, 0, 0, 1]])
+    assert sys._linear_outputs_symbols == [X1, X2, a]
+    assert sys._num_linear_outputs == 3
+    assert sys._num_simple_outputs == 4
+    assert sys._simple_outputs_matrix == sm.Matrix([ke, constraint, ke,
+                                                    constraint])
+    assert sys._simple_outputs_symbols == [T_, c_, K_, c2]
+    assert sys.num_outputs == 7
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2, a]
+
+    np.testing.assert_allclose(sys.evaluate_outputs(),
+        [0.0, -9.25, 9.5, -0.9092974268256817, 0.0, -0.9092974268256817, 0.0],
+                               atol=1e-12)
+
+    # Now when constraint loads are added, System will check KanesMethod for
+    # any auxilliary equations for the noncontributing forces. These will be
+    # appended to the outputs automatically. You have to add the correct number
+    # of constraint load symbols and they have to be present in the auxiliary
+    # equations.
+    with pytest.raises(ValueError):  # too many symbols
+        sys.noncontributing_forces = (T1, T2, u1)
+
+    sys.noncontributing_forces = (T1, T2)
+    assert sys._needs_code_regeneration
+
+    assert sys._linear_outputs_symbols == [X1, X2, a, T1, T2]
+    assert sys._num_linear_outputs == 5
+    assert sys._num_simple_outputs == 4
+    assert sys._simple_outputs_matrix == sm.Matrix([ke, constraint, ke,
+                                                    constraint])
+    assert sys.num_outputs == 9
+    assert sys.outputs_symbols == [T_, X1, X2, c_, K_, c2, a, T1, T2]
+
+    sys.constants = {
+        m1: 1.0,
+        m2: 2.0,
+        l1: 1.0,
+        l2: 2.0,
+        c: 1.0,
+        g: 9.81,
+    }
+
+    sys.initial_conditions = {
+        q1: 0.1,
+        q2: 0.0,
+    }
+
+    np.testing.assert_allclose(sys.evaluate_outputs(),
+        [
+            0.0,
+            -9.26439137981748,
+            10.96192493300433,
+            -0.8094640101788535,
+            0.0,
+            -0.8094640101788535,
+            -2.880676,
+            28.710670665299798,
+            19.044824599932618,
+        ])
+
+    sys.times = np.linspace(0.0, 4.0, num=400)
+
+    x_traj = sys.integrate()
+    assert x_traj.shape == (400, 9)  # shouldn't include dummy states?
+    xdot_traj = sys.evaluate_ode(x=x_traj)
+    assert x_traj.shape == (400, 9)  # shouldn't include dummy states?
+    y_traj = sys.evaluate_outputs(x=x_traj)
+    assert x_traj.shape == (400, 9)
+
+    rhs = sys.generate_ode_function()
+    print(rhs.__doc__)
+
+    if plot:
+        import matplotlib.pyplot as plt
+
+        fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
+                                 layout='constrained')
+        for ax, traj, s in zip(axes, x_traj.T, sys.states):
+            ax.plot(sys.times, traj)
+            ax.set_ylabel(sm.latex(s, mode='inline'))
+
+        fig, axes = plt.subplots(len(sys.states), 1, sharex=True,
+                                 layout='constrained')
+        for ax, traj, s in zip(axes, xdot_traj.T,
+                               [xi.diff() for xi in sys.coordinates +
+                                sys.speeds] +
+                               sys._linear_outputs_symbols):
+            ax.plot(sys.times, traj)
+            ax.set_ylabel(sm.latex(s, mode='inline'))
+
+        fig, axes = plt.subplots(sys.num_outputs, 1, sharex=True,
+                                 layout='constrained')
+        for ax, traj, s in zip(axes, y_traj.T, sys.outputs_symbols):
+            ax.plot(sys.times, traj)
+            ax.set_ylabel(sm.latex(s, mode='inline'))
+
+        plt.show()
