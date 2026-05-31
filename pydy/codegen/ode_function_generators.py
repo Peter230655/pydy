@@ -56,7 +56,7 @@ Parameters
 Returns
 =======
 dx : ndarray, shape({num_states},)
-    The derivative of the state vector.
+    The derivative of the state vector.{outputs_explanation}
 
 """
 
@@ -163,6 +163,12 @@ r : dictionary
 {specified_list}
 """
 
+    _outputs_doc_templates = \
+"""
+y : ndarray, shape({num_outputs},)
+    Values of the provided outputs.
+{output_list}\
+"""
     @staticmethod
     def _deduce_system_type(**kwargs):
         """Based on the combination of arguments this returns which ODE
@@ -191,7 +197,7 @@ r : dictionary
                  mass_matrix=None, coordinate_derivatives=None,
                  specifieds=None, linear_sys_solver='numpy',
                  constants_arg_type=None, specifieds_arg_type=None,
-                 time_first=False):
+                 time_first=False, outputs=None):
         """Generates a numerical function which can evaluate the right hand
         side of the first order ordinary differential equations from a
         system described by one of the following three symbolic forms:
@@ -202,6 +208,10 @@ r : dictionary
 
             [3] M(q, p) u' = F(q, u, t, r, p)
                 q' = G(q, u, t, r, p)
+
+        The function can also optionally return additional outputs in the form:
+
+            y = H(x, t, r, p)
 
         where
 
@@ -214,6 +224,7 @@ r : dictionary
             - M : mass matrix (full or minimum)
             - F : right hand side (full or minimum)
             - G : right hand side of the kinematical differential equations
+            - H : output expressions
 
         The generated function is of the form F(x, t, p) or F(x, t, r, p)
         depending on whether the system has specified inputs or not.
@@ -287,6 +298,8 @@ r : dictionary
             By default the argument order of the generated function is ``F(x,
             t, r, p)`` and, if this is set to true, it will be ``F(t, x, r,
             p)``.
+        outputs : sympy.Matrix, shape(o, 1), optional
+            Expressions that are a functions of (q, u, t, r, p).
         """
 
         self.right_hand_side = right_hand_side
@@ -300,6 +313,7 @@ r : dictionary
         self.constants_arg_type = constants_arg_type
         self.specifieds_arg_type = specifieds_arg_type
         self.time_first = time_first
+        self.outputs = outputs
 
         # As the order of the constants and specifieds arguments is not
         # important, allow Sets to be used as input. However, the order must be
@@ -323,6 +337,11 @@ r : dictionary
             self.specifieds_arg_type = None
         else:
             self.num_specifieds = len(specifieds)
+
+        if outputs is not None:
+            self.num_outputs = len(outputs)
+        else:
+            self.num_outputs = 0
 
         # These are pre-allocated storage for the numerical values used in
         # some of the rhs() evaluations.
@@ -383,8 +402,8 @@ r : dictionary
 
     @staticmethod
     def list_syms(indent, syms):
-        """Returns a string representation of a valid rst list of the
-        symbols in the sequence syms and indents the list given the integer
+        """Returns a string representation of a valid reStructuredText list of
+        the symbols in the sequence syms and indents the list given the integer
         number of indentations."""
         indentation = ' ' * indent
         lst = '- ' + ('\n' + indentation + '- ').join([str(s) for s in syms])
@@ -487,6 +506,11 @@ r : dictionary
                                 else ''),
             'time_par_after': ('' if self.time_first
                                else self._time_par_template),
+            'outputs_explanation':
+                self._outputs_doc_templates.format(num_outputs=self.num_outputs,
+                    output_list=self.list_syms(8,
+                        me.dynamicsymbols('y0:{}'.format(self.num_outputs))))
+                if self.outputs is not None else '',
         }
 
         if self.specifieds is not None:
@@ -512,6 +536,7 @@ r : dictionary
         x_idx = 1 if self.time_first else 0
 
         if p_arg_type is None and r_arg_type is None:
+
             def rhs(*args):
                 # args: x, t, p
                 # or
@@ -523,10 +548,12 @@ r : dictionary
                 u = args[x_idx][self.num_coordinates:]
 
                 if self.constants:
-                    xdot = self._base_rhs(q, u, *args[2:])
+                    return self._base_rhs(q, u, *args[2:])
                 else:
-                    xdot = self._base_rhs(q, u, *(args[2:3] + ([],)))
-                return xdot
+                    if self.specifieds is None:
+                        return self._base_rhs(q, u, [])
+                    else:
+                        return self._base_rhs(q, u, *(args[2:3] + ([],)))
 
             rhs.__doc__ = self._generate_rhs_docstring()
 
@@ -585,18 +612,27 @@ r : dictionary
         elif (self.system_type == 'full mass matrix' and
               self.linear_sys_solver=='sympy'):
 
-            def base_rhs(*args):
-                M, xdot = self.eval_arrays(*args)
-                return xdot
+            if self.outputs is None:
+                def base_rhs(*args):
+                    M, xdot = self.eval_arrays(*args)
+                    return xdot
+            else:
+                def base_rhs(*args):
+                    M, xdot, y = self.eval_arrays(*args)
+                    return xdot, y
 
             self._base_rhs = base_rhs
 
         elif self.system_type == 'full mass matrix':
 
-            def base_rhs(*args):
-
-                M, F = self.eval_arrays(*args)
-                return self._solve_linear_system(M, F)
+            if self.outputs is None:
+                def base_rhs(*args):
+                    M, F = self.eval_arrays(*args)
+                    return self._solve_linear_system(M, F)
+            else:
+                def base_rhs(*args):
+                    M, F, y = self.eval_arrays(*args)
+                    return self._solve_linear_system(M, F), y
 
             self._base_rhs = base_rhs
 
@@ -605,11 +641,18 @@ r : dictionary
 
             xdot = np.empty(self.num_states, dtype=float)
 
-            def base_rhs(*args):
-                M, udot, qdot = self.eval_arrays(*args)
-                xdot[:self.num_coordinates] = qdot
-                xdot[self.num_coordinates:] = udot
-                return xdot
+            if self.outputs is None:
+                def base_rhs(*args):
+                    M, udot, qdot = self.eval_arrays(*args)
+                    xdot[:self.num_coordinates] = qdot
+                    xdot[self.num_coordinates:] = udot
+                    return xdot
+            else:
+                def base_rhs(*args):
+                    M, udot, qdot, y = self.eval_arrays(*args)
+                    xdot[:self.num_coordinates] = qdot
+                    xdot[self.num_coordinates:] = udot
+                    return xdot, y
 
             self._base_rhs = base_rhs
 
@@ -617,15 +660,26 @@ r : dictionary
 
             xdot = np.empty(self.num_states, dtype=float)
 
-            def base_rhs(*args):
-                M, F, qdot = self.eval_arrays(*args)
-                if self.num_speeds == 1:
-                    udot = F / M
-                else:
-                    udot = self._solve_linear_system(M, F)
-                xdot[:self.num_coordinates] = qdot
-                xdot[self.num_coordinates:] = udot
-                return xdot
+            if self.outputs is None:
+                def base_rhs(*args):
+                    M, F, qdot = self.eval_arrays(*args)
+                    if self.num_speeds == 1:
+                        udot = F / M
+                    else:
+                        udot = self._solve_linear_system(M, F)
+                    xdot[:self.num_coordinates] = qdot
+                    xdot[self.num_coordinates:] = udot
+                    return xdot
+            else:
+                def base_rhs(*args):
+                    M, F, qdot, y = self.eval_arrays(*args)
+                    if self.num_speeds == 1:
+                        udot = F / M
+                    else:
+                        udot = self._solve_linear_system(M, F)
+                    xdot[:self.num_coordinates] = qdot
+                    xdot[self.num_coordinates:] = udot
+                    return xdot, y
 
             self._base_rhs = base_rhs
 
@@ -641,11 +695,11 @@ r : dictionary
         """Returns a function that evaluates the right hand side of the
         first order ordinary differential equations in one of two forms:
 
-            x' = f(x, t, p)
+            x'[, y] = f(x, t, p)
 
             or
 
-            x' = f(x, t, r, p)
+            x'[, y] = f(x, t, r, p)
 
         See the docstring of the generated function for more details.
 
@@ -749,8 +803,11 @@ verbose : boolean, optional, default False
 
         self.define_inputs()
         outputs = [self.right_hand_side]
-
         self._empties = (np.empty(self.num_states, dtype=float),)
+
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
+            self._empties += (np.empty(len(self.outputs), dtype=float),)
 
         self._set_eval_array(self._cythonize(outputs, self.inputs))
 
@@ -763,6 +820,10 @@ verbose : boolean, optional, default False
         rhs_result = np.empty(self.num_states, dtype=float)
 
         self._empties = (mass_matrix_result, rhs_result)
+
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
+            self._empties += (np.empty(len(self.outputs), dtype=float),)
 
         if self.linear_sys_solver == 'sympy':
             self._set_eval_array(self._cythonize_symbolic_lusolve(outputs,
@@ -780,6 +841,10 @@ verbose : boolean, optional, default False
         rhs_result = np.empty(self.num_speeds, dtype=float)
         kin_diffs_result = np.empty(self.num_coordinates, dtype=float)
         self._empties = (mass_matrix_result, rhs_result, kin_diffs_result)
+
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
+            self._empties += (np.empty(len(self.outputs), dtype=float),)
 
         if self.linear_sys_solver == 'sympy':
             self._set_eval_array(self._cythonize_symbolic_lusolve(outputs,
@@ -831,47 +896,68 @@ cse : boolean, optional, default True
 
         self.define_inputs()
         outputs = [self.right_hand_side]
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
 
         f = self._lambdify(outputs)
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: np.squeeze(f(q, u, p))
+            if self.outputs is None:
+                self.eval_arrays = lambda q, u, p: np.squeeze(f(q, u, p))
+            else:
+                def wrapper(q, u, p):
+                    xdot, y = f(q, u, p)
+                    return np.squeeze(xdot), np.atleast_1d(np.squeeze(y))
+                self.eval_arrays = wrapper
         else:
-            self.eval_arrays = lambda q, u, r, p: np.squeeze(f(q, u, r, p))
+            if self.outputs is None:
+                self.eval_arrays = lambda q, u, r, p: np.squeeze(f(q, u, r, p))
+            else:
+                def wrapper(q, u, r, p):
+                    xdot, y = f(q, u, r, p)
+                    return np.squeeze(xdot), np.atleast_1d(np.squeeze(y))
+                self.eval_arrays = wrapper
 
     def generate_full_mass_matrix_function(self):
 
         self.define_inputs()
         outputs = [self.mass_matrix, self.right_hand_side]
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
 
         f = self._lambdify(outputs)
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: tuple([np.squeeze(o) for o in
-                                                      f(q, u, p)])
+            self.eval_arrays = lambda q, u, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, p)])
         else:
-            self.eval_arrays = lambda q, u, r, p: tuple([np.squeeze(o) for o
-                                                         in f(q, u, r, p)])
+            self.eval_arrays = lambda q, u, r, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, r, p)])
 
     def generate_min_mass_matrix_function(self):
 
         self.define_inputs()
         outputs = [self.mass_matrix, self.right_hand_side,
                    self.coordinate_derivatives]
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
 
         f = self._lambdify(outputs)
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p: tuple([np.squeeze(o) for o in
-                                                      f(q, u, p)])
+            self.eval_arrays = lambda q, u, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, p)])
         else:
-            self.eval_arrays = lambda q, u, r, p: tuple([np.squeeze(o) for o
-                                                         in f(q, u, r, p)])
+            self.eval_arrays = lambda q, u, r, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, r, p)])
 
 
 class TheanoODEFunctionGenerator(ODEFunctionGenerator):
 
     def __init__(self, *args, **kwargs):
+
+        if self.outputs is not None:
+            raise ValueError('Theano generator does not support outputs.')
 
         if theano is None:
             raise ImportError('Theano must be installed to use this class.')
@@ -1018,16 +1104,30 @@ cse : boolean, optional, default True
 
         self.define_inputs()
         outputs = [self.right_hand_side]
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
 
         f = self._symjitify(outputs)
 
         # NOTE : symjit outputs a list of floats, not a NumPy array of floats.
         if self.specifieds is None:
-            def wrapper(q, u, p):
-                return np.asarray(f.apply(np.hstack((q, u, p))))
+            if self.outputs is None:
+                def wrapper(q, u, p):
+                    return np.asarray(f.apply(np.hstack((q, u, p))))
+            else:
+                def wrapper(q, u, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
+                    return (all_vals[:self.num_states],
+                            all_vals[self.num_states:])
         else:
-            def wrapper(q, u, r, p):
-                return np.asarray(f.apply(np.hstack((q, u, r, p))))
+            if self.outputs is None:
+                def wrapper(q, u, r, p):
+                    return np.asarray(f.apply(np.hstack((q, u, r, p))))
+            else:
+                def wrapper(q, u, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
+                    return (all_vals[:self.num_states],
+                            all_vals[self.num_states:])
 
         self.eval_arrays = wrapper
 
@@ -1035,23 +1135,41 @@ cse : boolean, optional, default True
 
         self.define_inputs()
         outputs = [self.mass_matrix, self.right_hand_side]
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
 
         f = self._symjitify(outputs)
 
-        m_dim = len(self.inputs[0]) + len(self.inputs[1])
+        n = self.num_states
 
         if self.specifieds is None:
-            def wrapper(q, u, p):
-                all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
-                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                f_vals = all_vals[m_dim*m_dim:]
-                return m_vals, f_vals
+            if self.outputs is None:
+                def wrapper(q, u, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
+                    m_vals = all_vals[:n*n].reshape(n, n)
+                    f_vals = all_vals[n*n:]
+                    return m_vals, f_vals
+            else:
+                def wrapper(q, u, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
+                    m_vals = all_vals[:n*n].reshape(n, n)
+                    f_vals = all_vals[n*n:n*n + n]
+                    y_vals = all_vals[n*n + n:]
+                    return m_vals, f_vals, y_vals
         else:
-            def wrapper(q, u, r, p):
-                all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
-                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                f_vals = all_vals[m_dim*m_dim:]
-                return m_vals, f_vals
+            if self.outputs is None:
+                def wrapper(q, u, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
+                    m_vals = all_vals[:n*n].reshape(n, n)
+                    f_vals = all_vals[n*n:]
+                    return m_vals, f_vals
+            else:
+                def wrapper(q, u, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
+                    m_vals = all_vals[:n*n].reshape(n, n)
+                    f_vals = all_vals[n*n:n*n + n]
+                    y_vals = all_vals[n*n + n:]
+                    return m_vals, f_vals, y_vals
 
         self.eval_arrays = wrapper
 
@@ -1060,25 +1178,47 @@ cse : boolean, optional, default True
         self.define_inputs()
         outputs = [self.mass_matrix, self.right_hand_side,
                    self.coordinate_derivatives]
+        if self.outputs is not None:
+            outputs.append(sm.Matrix(self.outputs))
 
         f = self._symjitify(outputs)
 
-        m_dim = len(self.inputs[1])
+        m_dim = self.num_speeds
+        f_dim = self.num_speeds
+        k_dim = self.num_coordinates
 
         if self.specifieds is None:
-            def convert_symjit_output(q, u, p):
-                all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
-                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + m_dim]
-                k_vals = all_vals[m_dim*m_dim + m_dim:]
-                return m_vals, f_vals, k_vals
+            if self.outputs is None:
+                def convert_symjit_output(q, u, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
+                    m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                    f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + f_dim]
+                    k_vals = all_vals[m_dim*m_dim + f_dim:]
+                    return m_vals, f_vals, k_vals
+            else:
+                def convert_symjit_output(q, u, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, p))))
+                    m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                    f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + f_dim]
+                    k_vals = all_vals[m_dim*m_dim + f_dim:m_dim*m_dim + f_dim + k_dim]
+                    y_vals = all_vals[m_dim*m_dim + m_dim + k_dim:]
+                    return m_vals, f_vals, k_vals, y_vals
         else:
-            def convert_symjit_output(q, u, r, p):
-                all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
-                m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
-                f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + m_dim]
-                k_vals = all_vals[m_dim*m_dim + m_dim:]
-                return m_vals, f_vals, k_vals
+            if self.outputs is None:
+                def convert_symjit_output(q, u, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
+                    m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                    f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + f_dim]
+                    k_vals = all_vals[m_dim*m_dim + f_dim:]
+                    return m_vals, f_vals, k_vals
+            else:
+                def convert_symjit_output(q, u, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p))))
+                    m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
+                    f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + f_dim]
+                    k_vals = all_vals[m_dim*m_dim + f_dim:m_dim*m_dim + f_dim + k_dim]
+                    y_vals = all_vals[m_dim*m_dim + f_dim + k_dim:]
+                    return m_vals, f_vals, k_vals, y_vals
 
         self.eval_arrays = convert_symjit_output
 

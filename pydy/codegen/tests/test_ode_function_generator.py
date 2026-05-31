@@ -28,6 +28,146 @@ from ...utils import PyDyImportWarning
 warnings.simplefilter('once', PyDyImportWarning)
 
 
+def test_outputs():
+    m1, m2, l1, l2, c, g = sm.symbols('m1, m2, l1, l2, c, g')
+    q1, q2, u1, u2, T1, T2 = me.dynamicsymbols('q1, q2, u1, u2, T1, T2')
+    u3, u4 = me.dynamicsymbols('u3, u4')
+
+    N = me.ReferenceFrame('N')
+    A = me.ReferenceFrame('A')
+    B = me.ReferenceFrame('B')
+
+    A.orient_axis(N, q1, N.z)
+    B.orient_axis(N, q2, N.z)
+    A.set_ang_vel(N, u1*N.z)
+    B.set_ang_vel(N, u2*N.z)
+
+    O = me.Point('O')
+    P1 = O.locatenew('P1', -l1*A.y)
+    P2 = P1.locatenew('P2', -l2*B.y)
+
+    O.set_vel(N, 0)
+    P1.v2pt_theory(O, N, A)
+    P1.set_vel(N, P1.vel(N) - u3*A.y)
+    P2.v2pt_theory(P1, N, B)
+    P2.set_vel(N, P2.vel(N) - u4*B.y)
+
+    bob1 = me.Particle('bob1', P1, m1)
+    bob2 = me.Particle('bob2', P2, m2)
+
+    loads = (
+        (P1, -m1*g*N.y + T1*A.y - T2*B.y),
+        (P2, -m2*g*N.y + T2*B.y),
+        (A, -c*u1*N.z + c*(u2 - u1)*N.z),
+        (B, - c*(u2 - u1)*N.z),
+    )
+
+    kane = me.KanesMethod(
+        N,
+        (q1, q2),
+        (u1, u2),
+        kd_eqs=[q1.diff() - u1, q2.diff() - u2],
+        bodies=(bob1, bob2),
+        forcelist=loads,
+        u_auxiliary=(u3, u4),
+    )
+    kane.kanes_equations()
+
+    qdot = sm.Matrix([u1, u2])
+
+    # augment the mass matrix for noncontributing forces
+    u = sm.Matrix([u1, u2])
+    lam = sm.Matrix([T1, T2])
+    int_of_lam = sm.Matrix([me.dynamicsymbols('I_{T1}, I_{T2}')])
+    x = u.diff().col_join(lam)
+
+    aux_eqs = kane.auxiliary_eqs
+    MuMj = aux_eqs.jacobian(x)  # [Mu Mj]
+    Fa = -aux_eqs.xreplace({fi: 0 for fi in x})  # [Fa]
+    Md = kane.mass_matrix
+    Mz = sm.zeros(Md.shape[0], len(lam))
+    mass_matrix = Md.row_join(Mz).col_join(MuMj)
+    Fd = kane.forcing
+    forcing = Fd.col_join(Fa)
+
+    # extra outputs
+    p1_x, p1_y, p1_z = P1.pos_from(O).to_matrix(N)
+    p2_x, p2_y, p2_z = P2.pos_from(O).to_matrix(N)
+    constraint = P2.pos_from(O).dot(N.x) - sm.sin(2*sm.pi)
+    kinetic_energy = (m1/2*P1.vel(N).dot(P1.vel(N)) +
+                      m2/2*P2.vel(N).dot(P2.vel(N))).xreplace({u3: 0, u4: 0})
+    potential_energy = m1*g*p1_y + m2*g*p2_y
+    outputs = sm.Matrix([
+        p1_x,
+        p1_y,
+        p2_x,
+        p2_y,
+        kinetic_energy,
+        potential_energy,
+        constraint,
+    ])
+
+    x = sm.Matrix((q1, q2, u1, u2, int_of_lam[0], int_of_lam[1]))
+    p = sm.Matrix((m1, m2, l1, l2, c, g))
+
+    t_val = 1.2
+    x_vals = np.deg2rad([3.0, -4.0, -20.0, 10.0, 0.0, 0.0])
+    p_vals = np.array([1.0, 2.0, 3.0, 4.0, 10.0, 9.81])
+
+    qdot_exp = list(x_vals[2:4])
+    udot_exp = np.array(mass_matrix.LUsolve(forcing).xreplace(
+        dict(zip(x, x_vals))).xreplace((dict(zip(p, p_vals)))).evalf()[:],
+        dtype=float)
+    y_exp = np.array(sm.Matrix((p1_x, p1_y, p2_x, p2_y, kinetic_energy,
+                       potential_energy, constraint,)).xreplace(
+                           dict(zip(x, x_vals))).xreplace(
+                               (dict(zip(p, p_vals)))).evalf()[:], dtype=float)
+
+    generators = ['lambdify']
+    try:
+        import Cython
+    except ImportError:
+        pass
+    else:
+        generators.append('cython')
+    try:
+        import symjit
+    except ImportError:
+        pass
+    else:
+        generators.append('symjit')
+
+    for generator in generators:
+        rhs = generate_ode_function(
+            forcing,
+            kane.q[:],
+            kane.u[:] + int_of_lam[:],
+            mass_matrix=mass_matrix,
+            coordinate_derivatives=qdot,
+            constants=p[:],
+            outputs=outputs,
+            generator=generator,
+        )
+        xdot, y = rhs(x_vals, t_val, p_vals)
+        np.testing.assert_allclose(np.hstack((qdot_exp, udot_exp)), xdot)
+        np.testing.assert_allclose(y_exp, y)
+
+    expected_end = \
+"""\
+y : ndarray, shape(7,)
+    Values of the provided outputs.
+        - y0(t)
+        - y1(t)
+        - y2(t)
+        - y3(t)
+        - y4(t)
+        - y5(t)
+        - y6(t)
+
+"""
+    assert rhs.__doc__.endswith(expected_end)
+
+
 def test_ccontiguous():
 
     x1, x2, v1, v2 = me.dynamicsymbols('x1, x2, v1, v2')
@@ -235,6 +375,8 @@ time_first : boolean, optional
     By default the argument order of the generated function is ``F(x,
     t, r, p)`` and, if this is set to true, it will be ``F(t, x, r,
     p)``.
+outputs : sympy.Matrix, shape(o, 1), optional
+    Expressions that are a functions of (q, u, t, r, p).
 generator : string or ODEFunctionGenerator, optional
     The method used for generating the numeric right hand side. The string
     options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
@@ -419,6 +561,11 @@ class TestODEFunctionGenerator(object):
                                               self.sys.coordinates,
                                               self.sys.speeds,
                                               self.sys.constants_symbols)
+        self.outputs = sm.Matrix([
+            b.kinetic_energy(self.sys.eom_method._inertial)
+            for b in self.sys.eom_method.bodies
+        ])
+
 
     def test_init_full_rhs(self):
 
@@ -462,6 +609,16 @@ class TestODEFunctionGenerator(object):
         assert g.num_speeds == 2
         assert g.num_states == 4
         assert g.system_type == 'min mass matrix'
+
+    def test_init_outputs(self):
+
+        g = ODEFunctionGenerator(self.rhs,
+                                 self.sys.coordinates,
+                                 self.sys.speeds,
+                                 self.sys.constants_symbols,
+                                 outputs=self.outputs)
+
+        assert g.num_outputs == 2
 
     def test_set_linear_system_solver(self):
 
@@ -551,8 +708,12 @@ class TestODEFunctionGeneratorSubclasses(object):
         # Best keep these in order, otherwise it may change between SymPy
         # versions.
         self.constants = list(sm.ordered(self.sys.constants_symbols))
+        self.outputs = sm.Matrix([
+            b.kinetic_energy(self.sys.eom_method._inertial)
+            for b in self.sys.eom_method.bodies
+        ])
 
-    def eval_rhs(self, rhs):
+    def eval_rhs(self, rhs, with_outputs=False):
 
         # In order:
         c0 = 1.0
@@ -562,9 +723,13 @@ class TestODEFunctionGeneratorSubclasses(object):
         x0 = 1.0
         v0 = 2.0
 
-        xdot = rhs(np.array([x0, v0]), 0.0, np.array([c0, k0, m0]))
-
         expected_xdot = np.array([v0, (-c0 * v0 - k0 * x0) / m0])
+
+        if with_outputs:
+            xdot, y = rhs(np.array([x0, v0]), 0.0, np.array([c0, k0, m0]))
+            np.testing.assert_allclose(y, [m0*v0**2/2])
+        else:
+            xdot = rhs(np.array([x0, v0]), 0.0, np.array([c0, k0, m0]))
 
         np.testing.assert_allclose(xdot, expected_xdot)
 
@@ -679,6 +844,59 @@ class TestODEFunctionGeneratorSubclasses(object):
                 xdot = f(x, 0.0, r, p)
 
                 np.testing.assert_allclose(xdot, expected)
+
+    def test_generate_full_rhs_with_outputs(self):
+
+        rhs = self.sys.eom_method.rhs()
+
+        for Subclass in self.ode_function_subclasses:
+
+            g = Subclass(rhs,
+                         self.sys.coordinates,
+                         self.sys.speeds,
+                         self.constants,
+                         outputs=self.outputs)
+
+            rhs_func = g.generate()
+
+            self.eval_rhs(rhs_func, with_outputs=True)
+
+    def test_generate_full_mass_matrix_with_outputs(self):
+
+        for Subclass in self.ode_function_subclasses:
+
+            g = Subclass(self.sys.eom_method.forcing_full,
+                         self.sys.coordinates,
+                         self.sys.speeds,
+                         self.constants,
+                         mass_matrix=self.sys.eom_method.mass_matrix_full,
+                         outputs=self.outputs)
+
+            rhs_func = g.generate()
+
+            print(self.outputs)
+
+            self.eval_rhs(rhs_func, with_outputs=True)
+
+    def test_generate_min_mass_matrix_with_outputs(self):
+
+        kin_diff_eqs = self.sys.eom_method.kindiffdict()
+        coord_derivs = sm.Matrix([kin_diff_eqs[c.diff()] for c in
+                                  self.sys.coordinates])
+
+        for Subclass in self.ode_function_subclasses:
+
+            g = Subclass(self.sys.eom_method.forcing,
+                         self.sys.coordinates,
+                         self.sys.speeds,
+                         self.constants,
+                         mass_matrix=self.sys.eom_method.mass_matrix,
+                         coordinate_derivatives=coord_derivs,
+                         outputs=self.outputs)
+
+            rhs_func = g.generate()
+
+            self.eval_rhs(rhs_func, with_outputs=True)
 
     def test_rhs_args(self):
         # This test takes a while to run but it checks all the combinations.

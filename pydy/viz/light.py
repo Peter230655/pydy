@@ -60,7 +60,7 @@ class PointLight(VisualizationFrame):
         >>> light = PointLight('light', I, O)
         >>> Ixx, Iyy, Izz, mass = symbols('Ixx Iyy Izz mass')
         >>> i = inertia(I, Ixx, Iyy, Izz)
-        >>> rbody = RigidBody('rbody', O, I, mass, (inertia, O))
+        >>> rbody = RigidBody('rbody', O, I, mass, (i, O))
         >>> # Initializing with a rigidbody ..
         >>> light = PointLight('frame2', rbody)
         >>> Pa = Particle('Pa', O, mass)

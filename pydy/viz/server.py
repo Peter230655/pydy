@@ -76,8 +76,9 @@ class Server(object):
 
     Example
     -------
-    >>> server = Server(scene_file=_scene_json_file)
-    >>> server.run_server()
+    ::
+        server = Server(scene_file=_scene_json_file)
+        server.run_server()
 
     """
     def __init__(self, scene_file, directory="static/", port=8000):
