@@ -14,6 +14,8 @@ Objectives
 
 - Show how to use ``PyDy Visualization`` to generate a 3D animation.
 - Show how to use a specific ODE_solver.
+- Show how to calculate noncontributing forces.
+  Here: reaction forces at the suspension point.
 
 
 Description
@@ -125,12 +127,21 @@ the 'child frame', otherwise the equations of motion become very large.
         A[i].set_ang_vel(N, u[3*i]*A[i].x + u[3*i+1]*A[i].y + u[3*i+2]*A[i].z)
         rot1.append(A[i].ang_vel_in(N))
 
-Locate the various points, and define their speeds.
+
+Set virtual speeds and noncontributing forces.
 
 .. jupyter-execute::
 
-    P[0].set_pos(P0, 0.)
-    P[0].set_vel(N, 0)  # Suspension point.
+    auxx, auxy, auxz, fx, fy, fz = me.dynamicsymbols('auxx auxy auxz fx fy fz')
+
+
+Locate the various points, and define their speeds. Add the virtual speeds to
+the suspension point P[0].
+
+.. jupyter-execute::
+
+    P[0].set_pos(P0, 0)
+    P[0].set_vel(N, auxx * N.x + auxy * N.y + auxz * N.z)  # Virtual speeds.
     Dmc[0].set_pos(P[0], l/2. * A[0].y)
     Dmc_link[0].set_pos(P[0], l/2. * A[0].y)
     Dmc_link[0].v2pt_theory(P[0], N, A[0])
@@ -201,7 +212,13 @@ There are:
         friction_i = (A[i], -reibung * u[3*i + 1] * A[i].y)  # around A[i].y
         FB.append(friction_i)
 
-    FL = FG + FB  # list of forces
+    FL = FG + FB
+
+Add the noncontributing forces (here: reaction forces) to the list of forces.
+
+.. jupyter-execute::
+
+    FL += [(P[0], fx * N.x + fy * N.y + fz * N.z)]
 
 Kinematic equations.
 
@@ -222,8 +239,16 @@ Finish Kanes's equations.
 
     q1 = q
     u1 = u
+    aux = [auxx, auxy, auxz]
 
-    KM = me.KanesMethod(N, q_ind=q1, u_ind=u1, kd_eqs=kd)
+    KM = me.KanesMethod(
+        N,
+        q_ind=q1,
+        u_ind=u1,
+        kd_eqs=kd,
+        u_auxiliary=aux
+    )
+
     fr, frstar = KM.kanes_equations(BODY, FL)
 
 
@@ -239,6 +264,13 @@ Define the energies.
         for i in range(n)]))
 
     kin_energie = sum([BODY[i].kinetic_energy(N) for i in range(3*n)])
+
+The virtual speeds appear in the kinetic energy, they must be set to zero.
+
+.. jupyter-execute::
+
+    kin_energie = me.msubs(kin_energie, {i: 0.0 for i in aux})
+
     spring_energie = sm.S(0.)
     for i in range(n):
         for j in range(i+1, n):
@@ -304,7 +336,11 @@ Set the initial conditions.
 
     sys.initial_conditions = sys.initial_conditions | q_rest_dict | u_rest_dict
 
+Give the list of noncontributing forces.
 
+.. jupyter-execute::
+
+    sys.noncontributing_forces = [fx, fy, fz]
 
 
 Below lambdify is used as speed is of no concern.
@@ -339,9 +375,9 @@ Numerical Integration
 
 .. jupyter-execute::
 
-    sys.generate_ode_function(generator='cython', linear_sys_solver='numpy')
+    sys.generate_ode_function(linear_sys_solver='numpy')
 
-    sys.times = np.linspace(0., 2.0, 50)
+    sys.times = np.linspace(0., 8.0, 100)
 
     resultat = sys.integrate(method='Radau', atol=1.e-6, rtol=1.e-6)
 
@@ -362,13 +398,13 @@ Plot Energy and Angular Speeds
     for i in range(schritte):
         zeit = sys.times[i]
         pot_np[i] = pot_lam(*[resultat[i, j]
-                              for j in range(resultat.shape[1])],
+                              for j in range(resultat.shape[1] - 3)],
                             *pL_vals)
         kin_np[i] = kin_lam(*[resultat[i, j]
-                              for j in range(resultat.shape[1])],
+                              for j in range(resultat.shape[1] - 3)],
                             *pL_vals)
         spring_np[i] = spring_lam(*[resultat[i, j]
-                                    for j in range(resultat.shape[1])],
+                                    for j in range(resultat.shape[1] - 3)],
                                   *pL_vals)
         total_np[i] = pot_np[i] + kin_np[i] + spring_np[i]
 
@@ -394,7 +430,68 @@ Plot Energy and Angular Speeds
                    f'body {i - n} in Y direction in its coordinate system')
     ax[1].set_title('Rotational speeds')
     ax[1].set_ylabel('Rotational speed')
-    ax[1].legend()
+    _ = ax[1].legend()
+
+
+Plot the reaction forces.
+
+.. jupyter-execute::
+
+    fig, ax = plt.subplots(figsize=(8, 2), layout='constrained')
+    ax.plot(sys.times, resultat[:, -3], label='reaction force in x direction')
+    ax.set_title('Reaction forces at the suspension point')
+    ax.plot(sys.times, resultat[:, -2], label='reaction force in y direction')
+    ax.plot(sys.times, resultat[:, -1], label='reaction force in z direction')
+    ax.set_xlabel('time')
+    _ = ax.legend()
+
+    print(f"fx(0) = {resultat[0, -3]:.3f}, fy(0) = {resultat[0, -2]:.3f}, "
+          f"fz(0) = {resultat[0, -1]:.3f}, \n")
+
+    print('outputs of the system', sys.outputs)
+
+Reaction forces the old way.
+
+.. jupyter-execute::
+
+    from scipy.optimize import root
+
+    rhs = list(sm.symbols(f'rhs:{3*n}'))
+    rhs_dict = {i.diff(t): rhs[j] for j, i in enumerate(u)}
+    react_force = KM.auxiliary_eqs.subs(rhs_dict)
+    react_force_lam = sm.lambdify([fx, fy, fz] + qL + rhs + pL, react_force,
+    cse=True)
+
+    RHS = sys.evaluate_ode(x=resultat, t=sys.times)
+
+
+    fx_np = np.empty(schritte)
+    fy_np = np.empty(schritte)
+    fz_np = np.empty(schritte)
+
+
+    def func(y0, args):
+        return react_force_lam(*y0, *args).squeeze()
+
+
+    y0 = (0.0, 0.0, 0.0)  # initial guess for the reaction forces
+    for i in range(schritte):
+        args = ([resultat[i, j] for j in range(resultat.shape[1] - 3)] +
+                [RHS[i, j] for j in range(3*n, 6*n)] + pL_vals)
+        sol = root(func, y0, args=args)
+        fx_np[i], fy_np[i], fz_np[i] = sol.x
+        y0 = sol.x  # use the solution as the initial guess for the next step
+
+    fig, ax = plt.subplots(figsize=(8, 2), layout='constrained')
+    ax.plot(sys.times, fx_np, label='reaction force in x direction')
+    ax.set_title('Reaction forces at the suspension point, old way')
+    ax.plot(sys.times, fy_np, label='reaction force in y direction')
+    ax.plot(sys.times, fz_np, label='reaction force in z direction')
+    ax.set_xlabel('time')
+    _ = ax.legend()
+
+    print(f"fx(0) = {fx_np[0]:.3f}, fy(0) = {fy_np[0]:.3f}, "
+          f"fz(0) = {fz_np[0]:.3f}")
 
 
 Animation with PyDy Visualization
@@ -444,7 +541,8 @@ found by trial and error.
     pL_vals_scene = [val / groesse for val in pL_vals]
     scene.constants = dict(zip(pL, pL_vals_scene))
     scene.states_symbols = q + u
-    scene.states_trajectories = resultat
+
+    scene.states_trajectories = resultat[:, :-3]
 
     scene.display_jupyter(axes_arrow_length=20)
 
