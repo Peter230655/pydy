@@ -204,7 +204,7 @@ class System(object):
     outputs : dictionary, optional
         Maps functions of time or tuples of functions of time to expressions or
         iterables of expressions, respectively. In general, the expressions
-        should be a function of the state, constants, and specfieds.
+        should be a function of the state, constants, and specifieds.
         Expressions that are linear in the functions of time and/or the time
         derivatives of the speeds are also supported, but not yet nonlinear
         functions of these variables.
