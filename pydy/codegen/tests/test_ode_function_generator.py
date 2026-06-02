@@ -754,6 +754,25 @@ class TestODEFunctionGeneratorSubclasses(object):
 
             self.eval_rhs(rhs_func)
 
+    def test_generate_full_rhs_with_explicit_t(self):
+
+        t = me.dynamicsymbols._t
+
+        rhs = self.sys.eom_method.rhs()
+        rhs[1, 0] = rhs[1, 0] + sm.sin(t)
+
+        for Subclass in self.ode_function_subclasses:
+
+            g = Subclass(rhs,
+                         self.sys.coordinates,
+                         self.sys.speeds,
+                         self.constants)
+
+            rhs_func = g.generate()
+
+            self.eval_rhs(rhs_func)
+
+
     def test_generate_full_mass_matrix(self):
 
         for Subclass in self.ode_function_subclasses:
