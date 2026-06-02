@@ -428,8 +428,6 @@ y : ndarray, shape({num_outputs},)
         """Returns an ndarray containing the numerical values of the
         constants in the correct order. If the constants are already an
         array, that array is returned."""
-        print(args)
-
         if self.constants:
             p = args[-1]
         else:
