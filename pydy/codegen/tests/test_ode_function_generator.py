@@ -713,7 +713,7 @@ class TestODEFunctionGeneratorSubclasses(object):
             for b in self.sys.eom_method.bodies
         ])
 
-    def eval_rhs(self, rhs, with_outputs=False):
+    def eval_rhs(self, rhs, with_outputs=False, with_sint=False):
 
         # In order:
         c0 = 1.0
@@ -723,13 +723,19 @@ class TestODEFunctionGeneratorSubclasses(object):
         x0 = 1.0
         v0 = 2.0
 
-        expected_xdot = np.array([v0, (-c0 * v0 - k0 * x0) / m0])
+        t = 1.39
+
+        if with_sint:
+            expected_xdot = np.array([v0,
+                                      (-c0 * v0 - k0 * x0) / m0 + np.sin(t)])
+        else:
+            expected_xdot = np.array([v0, (-c0 * v0 - k0 * x0) / m0])
 
         if with_outputs:
-            xdot, y = rhs(np.array([x0, v0]), 0.0, np.array([c0, k0, m0]))
+            xdot, y = rhs(np.array([x0, v0]), t, np.array([c0, k0, m0]))
             np.testing.assert_allclose(y, [m0*v0**2/2])
         else:
-            xdot = rhs(np.array([x0, v0]), 0.0, np.array([c0, k0, m0]))
+            xdot = rhs(np.array([x0, v0]), t, np.array([c0, k0, m0]))
 
         np.testing.assert_allclose(xdot, expected_xdot)
 
@@ -770,7 +776,7 @@ class TestODEFunctionGeneratorSubclasses(object):
 
             rhs_func = g.generate()
 
-            self.eval_rhs(rhs_func)
+            self.eval_rhs(rhs_func, with_sint=True)
 
 
     def test_generate_full_mass_matrix(self):
