@@ -13,14 +13,12 @@ import pytest
 from packaging.version import parse as parse_version
 
 Cython = sm.external.import_module('Cython')
-theano = sm.external.import_module('theano')
 symjit = sm.external.import_module('symjit')
 
 from ... import models
 from ..ode_function_generators import (ODEFunctionGenerator,
                                        LambdifyODEFunctionGenerator,
                                        CythonODEFunctionGenerator,
-                                       TheanoODEFunctionGenerator,
                                        SymjitODEFunctionGenerator)
 
 from ...utils import PyDyImportWarning
@@ -379,7 +377,7 @@ outputs : sympy.Matrix, shape(o, 1), optional
     Expressions that are a functions of (q, u, t, r, p).
 generator : string or ODEFunctionGenerator, optional
     The method used for generating the numeric right hand side. The string
-    options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
+    options are ``{'lambdify'|'cython'|'symjit'}`` with ``lambdify``
     being the default. You can also pass in a custom subclass of
     ODEFunctionGenerator.
 kwargs
@@ -399,7 +397,7 @@ def test_symbolic_linear_solve_full_mass_matrix():
     sys = models.n_link_pendulum_on_cart(n=5, cart_force=False,
                                          joint_torques=False)
 
-    # symbolic solve only works with cython, raises with lambdify or theano
+    # symbolic solve only works with cython, raises with lambdify
     with pytest.raises(ValueError):
         generate_ode_function(
             sys.eom_method.forcing_full,
@@ -684,12 +682,6 @@ class TestODEFunctionGeneratorSubclasses(object):
         ode_function_subclasses.append(CythonODEFunctionGenerator)
     else:
         warnings.warn("Cython was not found so the related tests are being"
-                      " skipped.", PyDyImportWarning)
-
-    if theano:
-        ode_function_subclasses.append(TheanoODEFunctionGenerator)
-    else:
-        warnings.warn("Theano was not found so the related tests are being"
                       " skipped.", PyDyImportWarning)
 
     if symjit:

@@ -26,7 +26,6 @@ extras_require = {
     ],
     'codegen': [
         'Cython>=0.29.37',  # cython3-legacy
-        'Theano>=1.0.5',  # not in Ubuntu repos, 2020-07-27 PyPi release
         'symjit>=2.5.0',  # not in Ubuntu repos
     ],
     'examples': [

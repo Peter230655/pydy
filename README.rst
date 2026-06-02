@@ -118,7 +118,6 @@ PyDy has hard dependencies on the following software\ [#]_:
 PyDy has optional dependencies for extended code generation on:
 
 - Cython_ >= 0.29.37
-- Theano_ >= 1.0.5
 - Symjit_ >= 2.5.0
 
 and animated visualizations with ``Scene.display_jupyter()`` on:
@@ -133,7 +132,6 @@ or interactive animated visualizations with ``Scene.display_ipython()`` on:
 - 4.0.0 <= ipywidgets_ < 5.0.0
 
 .. _Cython: http://cython.org/
-.. _Theano: http://deeplearning.net/software/theano/
 .. _Symjit: https://github.com/siravan/symjit
 .. _Jupyter Notebook: https://jupyter-notebook.readthedocs.io
 .. _Jupyter Lab: https://jupyterlab.readthedocs.io
@@ -267,7 +265,7 @@ Code Generation (codegen)
 This package provides code generation facilities. It generates functions that
 can numerically evaluate the right hand side of the ordinary differential
 equations generated with sympy.physics.mechanics_ with four different
-backends: SymPy's lambdify_, Theano, Cython, and Symjit.
+backends: SymPy's lambdify_, Cython, and Symjit.
 
 .. _sympy.physics.mechanics: http://docs.sympy.org/latest/modules/physics/mechanics
 .. _lambdify: http://docs.sympy.org/latest/modules/utilities/lambdify.html#sympy.utilities.lambdify.lambdify
@@ -318,7 +316,7 @@ The following installation assumes you have virtualenvwrapper_ in addition to
 virtualenv and all the dependencies needed to build the various packages::
 
    $ mkvirtualenv pydy-dev
-   (pydy-dev)$ pip install numpy scipy cython pytest theano symjit sympy ipython notebook ipywidgets version_information pip setuptools
+   (pydy-dev)$ pip install numpy scipy cython pytest symjit sympy ipython notebook ipywidgets version_information pip setuptools
    (pydy-dev)$ pip install matplotlib # make sure to do this after numpy
    (pydy-dev)$ git clone git@github.com:pydy/pydy.git
    (pydy-dev)$ cd pydy
@@ -328,7 +326,7 @@ virtualenv and all the dependencies needed to build the various packages::
 
 Or with conda_::
 
-   $ conda create -c pydy -n pydy-dev setuptools numpy scipy ipython "notebook<5.0" "ipywidgets<5.0" cython pytest theano symjit sympy matplotlib version_information
+   $ conda create -c pydy -n pydy-dev setuptools numpy scipy ipython "notebook<5.0" "ipywidgets<5.0" cython pytest symjit sympy matplotlib version_information
    $ source activate pydy-dev
    (pydy-dev)$ git clone git@github.com:pydy/pydy.git
    (pydy-dev)$ cd pydy

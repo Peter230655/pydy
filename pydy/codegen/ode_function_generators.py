@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 
-import sys
 from collections.abc import Sequence
-from itertools import chain
 import logging
 from importlib import metadata
 import textwrap
-from warnings import warn
 
 import numpy as np
 import numpy.linalg
@@ -16,10 +13,7 @@ import sympy.physics.mechanics as me
 from sympy.core.function import UndefinedFunction, Derivative
 from packaging.version import parse as parse_version
 Cython = sm.external.import_module('Cython')
-theano = sm.external.import_module('theano')
 symjit = sm.external.import_module('symjit')
-if theano:
-    from sympy.printing.theanocode import theano_function
 if symjit:
     from symjit import compile_func
 
@@ -966,102 +960,6 @@ cse : boolean, optional, default True
                 [np.atleast_1d(np.squeeze(o)) for o in f(q, u, t, r, p)])
 
 
-class TheanoODEFunctionGenerator(ODEFunctionGenerator):
-
-    def __init__(self, *args, **kwargs):
-
-        if self.outputs is not None:
-            raise ValueError('Theano generator does not support outputs.')
-
-        if theano is None:
-            raise ImportError('Theano must be installed to use this class.')
-        else:
-            msg = ('Support for Theano code generation is deprecated as of '
-                   'PyDy version 0.9.0. It will be removed in a future '
-                   'version.')
-            warn(msg, DeprecationWarning, stacklevel=2)
-            super(TheanoODEFunctionGenerator, self).__init__(*args, **kwargs)
-
-    __init__.__doc__ = ODEFunctionGenerator.__init__.__doc__
-
-    def define_inputs(self):
-        # Theano's input requires a flatted sequence instead of sequence of
-        # sequences.
-        specifieds = []
-        if self.specifieds is not None:
-            specifieds = self.specifieds
-        self.inputs = chain(self.coordinates, self.speeds,
-                            specifieds, self.constants)
-
-    def _theanoize(self, outputs):
-
-        self.define_inputs()
-
-        old_check_input = theano.config.check_input
-        old_allow_gc = theano.config.allow_gc
-        try:
-            # This affects compilation and removes the input check at each step.
-            theano.config.check_input = False
-
-            # Disable Theano garbage collection to lower the number of allocations.
-            theano.config.allow_gc = False
-
-            f_imp = theano_function(self.inputs, outputs,
-                                    on_unused_input='ignore',
-                                    mode=theano.Mode(linker='c'))
-        finally:
-            theano.config.check_input = old_check_input
-            theano.config.allow_gc = old_allow_gc
-
-        # While denoting an input as trusted lowers Theano overhead:
-        #     f.trust_input = True
-        # we can bypass additional overhead with the following function:
-        def f(*args):
-            for i in range(len(args)):
-                f_imp.input_storage[i].storage[0] = args[i]
-            f_imp.fn()
-            return [f_imp.output_storage[i].data for i in range(len(outputs))]
-
-        return f
-
-    def generate_full_rhs_function(self):
-
-        outputs = [self.right_hand_side]
-
-        f = self._theanoize(outputs)
-
-        def eval_arrays(*args):
-            vals = map(np.asarray, np.hstack(args))
-            return np.squeeze(f(*vals))
-
-        self.eval_arrays = eval_arrays
-
-    def generate_full_mass_matrix_function(self):
-
-        outputs = [self.mass_matrix, self.right_hand_side]
-
-        f = self._theanoize(outputs)
-
-        def eval_arrays(*args):
-            vals = map(np.asarray, np.hstack(args))
-            return tuple([np.squeeze(o) for o in f(*vals)])
-
-        self.eval_arrays = eval_arrays
-
-    def generate_min_mass_matrix_function(self):
-
-        outputs = [self.mass_matrix, self.right_hand_side,
-                   self.coordinate_derivatives]
-
-        f = self._theanoize(outputs)
-
-        def eval_arrays(*args):
-            vals = map(np.asarray, np.hstack(args))
-            return tuple([np.squeeze(o) for o in f(*vals)])
-
-        self.eval_arrays = eval_arrays
-
-
 class SymjitODEFunctionGenerator(ODEFunctionGenerator):
 
     _extra_doc = \
@@ -1243,7 +1141,6 @@ def generate_ode_function(*args, **kwargs):
 
     generators = {'lambdify': LambdifyODEFunctionGenerator,
                   'cython': CythonODEFunctionGenerator,
-                  'theano': TheanoODEFunctionGenerator,
                   'symjit': SymjitODEFunctionGenerator}
 
     generator = kwargs.pop('generator', 'lambdify')
@@ -1280,7 +1177,7 @@ _extra_parameters_doc = \
 """\
 generator : string or ODEFunctionGenerator, optional
     The method used for generating the numeric right hand side. The string
-    options are ``{'lambdify'|'theano'|'cython'|'symjit'}`` with ``lambdify``
+    options are ``{'lambdify'|'cython'|'symjit'}`` with ``lambdify``
     being the default. You can also pass in a custom subclass of
     ODEFunctionGenerator.
 kwargs
