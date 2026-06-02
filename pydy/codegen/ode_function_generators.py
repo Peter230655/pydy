@@ -614,7 +614,7 @@ y : ndarray, shape({num_outputs},)
 
     def _create_base_rhs_function(self):
         """Sets the self._base_rhs function. This function accepts arguments
-        in this form: (q, u, p) or (q, u, r, p)."""
+        in this form: (q, u, t, p) or (q, u, t, r, p)."""
 
         if self.system_type == 'full rhs':
 
