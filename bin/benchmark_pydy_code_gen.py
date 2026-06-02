@@ -16,7 +16,7 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
     for each n up to the max number provided and generates a plot of the
     results."""
 
-    methods = ['lambdify', 'cython', 'theano', 'symjit', 'cython:sympy']
+    methods = ['lambdify', 'cython', 'symjit', 'cython:sympy']
 
     link_numbers = range(1, max_num_links + 1)
 
@@ -78,9 +78,8 @@ def run_benchmark(max_num_links, num_time_steps=1000, duration=10.0):
                                                     cse=True)
                 else:
                     rhs = sys.generate_ode_function(generator=method, cse=True)
-            # ImportError: Theano or Cython not installed
-            # AttributeError: Theano doesn't work with new NumPy versions
-            except (ImportError, AttributeError):
+            # ImportError: Cython not installed
+            except (ImportError):
                 print("Skipped {} due to error.\n".format(method))
                 code_generation_times[j, k] = np.nan
                 integration_times[j, k] = np.nan

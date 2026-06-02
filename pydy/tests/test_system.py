@@ -11,8 +11,8 @@ import sympy as sm
 import sympy.physics.mechanics as me
 from scipy.integrate import odeint
 import pytest
-theano = sm.external.import_module('theano')
 Cython = sm.external.import_module('Cython')
+symjit = sm.external.import_module('symjit')
 
 from ..system import System
 from ..models import multi_mass_spring_damper, n_link_pendulum_on_cart
@@ -477,13 +477,13 @@ class TestSystem():
 
         # Test a generator other than lambdify.
         # -------------------------------------
-        if theano:
-            sys.generate_ode_function(generator='theano')
+        if symjit:
+            sys.generate_ode_function(generator='symjit')
             sys.times = times
             x_06 = sys.integrate()
             testing.assert_allclose(x_04, x_06)
         else:
-            warnings.warn("Theano was not found so the related tests are being"
+            warnings.warn("Symjit was not found so the related tests are being"
                           " skipped.", PyDyImportWarning)
 
         # Unrecognized generator.
