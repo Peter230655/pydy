@@ -428,8 +428,12 @@ y : ndarray, shape({num_outputs},)
         """Returns an ndarray containing the numerical values of the
         constants in the correct order. If the constants are already an
         array, that array is returned."""
+        print(args)
 
-        p = args[-1]
+        if self.constants:
+            p = args[-1]
+        else:
+            return args
         try:
             # NOTE : This emits "VisibleDeprecationWarning: using a non-integer
             # number instead of an integer will result in an error in the
@@ -534,6 +538,11 @@ y : ndarray, shape({num_outputs},)
         r_arg_type = self.specifieds_arg_type
 
         x_idx = 1 if self.time_first else 0
+        t_idx = 0 if self.time_first else 1
+
+        # NOTE : ODEFunctionGenerator only supports array inputs, so we have to
+        # store time in an array.
+        time_storage = np.array([0.0])
 
         if p_arg_type is None and r_arg_type is None:
 
@@ -544,18 +553,18 @@ y : ndarray, shape({num_outputs},)
 
                 args = self._parse_all_args(*args)
 
+                time_storage[0] = args[t_idx]
                 q = args[x_idx][:self.num_coordinates]
                 u = args[x_idx][self.num_coordinates:]
 
-                t = np.array([args[1]])
-
                 if self.constants:
-                    return self._base_rhs(q, u, *args[2:], t)
+                    return self._base_rhs(q, u, time_storage, *args[2:])
                 else:
                     if self.specifieds is None:
-                        return self._base_rhs(q, u, [], t)
+                        return self._base_rhs(q, u, time_storage, [])
                     else:
-                        return self._base_rhs(q, u, *(args[2:3] + ([],)), t)
+                        return self._base_rhs(q, u, time_storage,
+                                              *(args[2:3] + ([],)))
 
             rhs.__doc__ = self._generate_rhs_docstring()
 
@@ -588,18 +597,18 @@ y : ndarray, shape({num_outputs},)
             q = args[x_idx][:self.num_coordinates]
             u = args[x_idx][self.num_coordinates:]
 
-            t = np.array([args[1]])
+            time_storage[0] = args[t_idx]
 
             if self.specifieds is None:
                 if self.constants:
-                    return self._base_rhs(q, u, p(*args), t)
+                    return self._base_rhs(q, u, time_storage, p(*args))
                 else:
-                    return self._base_rhs(q, u, [], t)
+                    return self._base_rhs(q, u, time_storage, [])
             else:
                 if self.constants:
-                    return self._base_rhs(q, u, r(*args), p(*args), t)
+                    return self._base_rhs(q, u, time_storage, r(*args), p(*args))
                 else:
-                    return self._base_rhs(q, u, r(*args), [], t)
+                    return self._base_rhs(q, u, time_storage, r(*args), [])
 
         rhs.__doc__ = self._generate_rhs_docstring()
 
@@ -688,14 +697,13 @@ y : ndarray, shape({num_outputs},)
             self._base_rhs = base_rhs
 
     def define_inputs(self):
-        """Sets self.inputs to the list of sequences [q, u, p] or [q, u, r,
-        p]."""
+        """Sets self.inputs to the list of sequences [q, u, t, p] or [q, u, t,
+        r, p]."""
 
         t = me.dynamicsymbols._t
-        # can t just be a singleton? not a list?
-        self.inputs = [self.coordinates, self.speeds, self.constants, [t]]
+        self.inputs = [self.coordinates, self.speeds, [t], self.constants]
         if self.specifieds is not None:
-            self.inputs.insert(2, self.specifieds)
+            self.inputs.insert(3, self.specifieds)
 
     def generate(self):
         """Returns a function that evaluates the right hand side of the
@@ -793,18 +801,18 @@ verbose : boolean, optional, default False
 
         if self.specifieds is None:
             if self._options['force_c_contiguous']:
-                self.eval_arrays = lambda q, u, p, t: f(c(q), c(u), c(p), c(t),
+                self.eval_arrays = lambda q, u, t, p: f(c(q), c(u), c(t), c(p),
                                                         *self._empties)
             else:
-                self.eval_arrays = lambda q, u, p, t: f(q, u, p, t
-                                                        , *self._empties)
+                self.eval_arrays = lambda q, u, t, p: f(q, u, t, p,
+                                                        *self._empties)
         else:
             if self._options['force_c_contiguous']:
-                self.eval_arrays = lambda q, u, r, p, t: f(c(q), c(u), c(r),
-                                                           c(p), c(t),
+                self.eval_arrays = lambda q, u, t, r, p: f(c(q), c(u), c(t),
+                                                           c(r), c(p),
                                                            *self._empties)
             else:
-                self.eval_arrays = lambda q, u, r, p, t: f(q, u, r, p, t,
+                self.eval_arrays = lambda q, u, t, r, p: f(q, u, t, r, p,
                                                            *self._empties)
 
     def generate_full_rhs_function(self):
@@ -911,18 +919,18 @@ cse : boolean, optional, default True
 
         if self.specifieds is None:
             if self.outputs is None:
-                self.eval_arrays = lambda q, u, p, t: np.squeeze(f(q, u, p, t))
+                self.eval_arrays = lambda q, u, t, p: np.squeeze(f(q, u, t, p))
             else:
-                def wrapper(q, u, p, t):
-                    xdot, y = f(q, u, p, t)
+                def wrapper(q, u, t, p):
+                    xdot, y = f(q, u, t, p)
                     return np.squeeze(xdot), np.atleast_1d(np.squeeze(y))
                 self.eval_arrays = wrapper
         else:
             if self.outputs is None:
-                self.eval_arrays = lambda q, u, r, p, t: np.squeeze(f(q, u, r, p, t))
+                self.eval_arrays = lambda q, u, t, r, p: np.squeeze(f(q, u, t, r, p))
             else:
-                def wrapper(q, u, r, p, t):
-                    xdot, y = f(q, u, r, p, t)
+                def wrapper(q, u, t, r, p):
+                    xdot, y = f(q, u, t, r, p)
                     return np.squeeze(xdot), np.atleast_1d(np.squeeze(y))
                 self.eval_arrays = wrapper
 
@@ -936,11 +944,11 @@ cse : boolean, optional, default True
         f = self._lambdify(outputs)
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p, t: tuple(
-                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, p, t)])
+            self.eval_arrays = lambda q, u, t, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, t, p)])
         else:
-            self.eval_arrays = lambda q, u, r, p, t: tuple(
-                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, r, p, t)])
+            self.eval_arrays = lambda q, u, t, r, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, t, r, p)])
 
     def generate_min_mass_matrix_function(self):
 
@@ -953,11 +961,11 @@ cse : boolean, optional, default True
         f = self._lambdify(outputs)
 
         if self.specifieds is None:
-            self.eval_arrays = lambda q, u, p, t: tuple(
-                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, p, t)])
+            self.eval_arrays = lambda q, u, t, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, t, p)])
         else:
-            self.eval_arrays = lambda q, u, r, p, t: tuple(
-                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, r, p, t)])
+            self.eval_arrays = lambda q, u, t, r, p: tuple(
+                [np.atleast_1d(np.squeeze(o)) for o in f(q, u, t, r, p)])
 
 
 class TheanoODEFunctionGenerator(ODEFunctionGenerator):
@@ -1120,20 +1128,20 @@ cse : boolean, optional, default True
         # NOTE : symjit outputs a list of floats, not a NumPy array of floats.
         if self.specifieds is None:
             if self.outputs is None:
-                def wrapper(q, u, p, t):
-                    return np.asarray(f.apply(np.hstack((q, u, p, t))))
+                def wrapper(q, u, t, p):
+                    return np.asarray(f.apply(np.hstack((q, u, t, p))))
             else:
-                def wrapper(q, u, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, p, t))))
+                def wrapper(q, u, t, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, p))))
                     return (all_vals[:self.num_states],
                             all_vals[self.num_states:])
         else:
             if self.outputs is None:
-                def wrapper(q, u, r, p, t):
-                    return np.asarray(f.apply(np.hstack((q, u, r, p, t))))
+                def wrapper(q, u, t, r, p):
+                    return np.asarray(f.apply(np.hstack((q, u, t, r, p))))
             else:
-                def wrapper(q, u, r, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p, t))))
+                def wrapper(q, u, t, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, r, p))))
                     return (all_vals[:self.num_states],
                             all_vals[self.num_states:])
 
@@ -1152,28 +1160,28 @@ cse : boolean, optional, default True
 
         if self.specifieds is None:
             if self.outputs is None:
-                def wrapper(q, u, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, p, t))))
+                def wrapper(q, u, t, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, p))))
                     m_vals = all_vals[:n*n].reshape(n, n)
                     f_vals = all_vals[n*n:]
                     return m_vals, f_vals
             else:
-                def wrapper(q, u, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, p, t))))
+                def wrapper(q, u, t, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, p))))
                     m_vals = all_vals[:n*n].reshape(n, n)
                     f_vals = all_vals[n*n:n*n + n]
                     y_vals = all_vals[n*n + n:]
                     return m_vals, f_vals, y_vals
         else:
             if self.outputs is None:
-                def wrapper(q, u, r, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p, t))))
+                def wrapper(q, u, t, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, r, p))))
                     m_vals = all_vals[:n*n].reshape(n, n)
                     f_vals = all_vals[n*n:]
                     return m_vals, f_vals
             else:
-                def wrapper(q, u, r, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p, t))))
+                def wrapper(q, u, t, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, r, p))))
                     m_vals = all_vals[:n*n].reshape(n, n)
                     f_vals = all_vals[n*n:n*n + n]
                     y_vals = all_vals[n*n + n:]
@@ -1197,15 +1205,15 @@ cse : boolean, optional, default True
 
         if self.specifieds is None:
             if self.outputs is None:
-                def convert_symjit_output(q, u, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, p, t))))
+                def convert_symjit_output(q, u, t, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, p))))
                     m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                     f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + f_dim]
                     k_vals = all_vals[m_dim*m_dim + f_dim:]
                     return m_vals, f_vals, k_vals
             else:
-                def convert_symjit_output(q, u, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, p, t))))
+                def convert_symjit_output(q, u, t, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, p))))
                     m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                     f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + f_dim]
                     k_vals = all_vals[m_dim*m_dim + f_dim:m_dim*m_dim + f_dim + k_dim]
@@ -1213,15 +1221,15 @@ cse : boolean, optional, default True
                     return m_vals, f_vals, k_vals, y_vals
         else:
             if self.outputs is None:
-                def convert_symjit_output(q, u, r, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p, t))))
+                def convert_symjit_output(q, u, t, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, r, p))))
                     m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                     f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + f_dim]
                     k_vals = all_vals[m_dim*m_dim + f_dim:]
                     return m_vals, f_vals, k_vals
             else:
-                def convert_symjit_output(q, u, r, p, t):
-                    all_vals = np.asarray(f.apply(np.hstack((q, u, r, p, t))))
+                def convert_symjit_output(q, u, t, r, p):
+                    all_vals = np.asarray(f.apply(np.hstack((q, u, t, r, p))))
                     m_vals = all_vals[:m_dim*m_dim].reshape(m_dim, m_dim)
                     f_vals = all_vals[m_dim*m_dim:m_dim*m_dim + f_dim]
                     k_vals = all_vals[m_dim*m_dim + f_dim:m_dim*m_dim + f_dim + k_dim]
