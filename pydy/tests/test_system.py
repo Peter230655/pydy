@@ -1143,7 +1143,7 @@ def test_system_with_noncontributing_forces(plot=False):
 def test_explicit_time():
     sys = multi_mass_spring_damper(1, apply_gravity=True,
                                    apply_external_forces=True,
-                                   make_force_explicit_in_time=True)
+                                   external_force_as_sin_of_t=True)
     constant_map = dict(zip(sm.symbols('m0, k0, c0, g'),
                             [2.0, 1.5, 0.5, 9.8]))
     sys.constants = constant_map
