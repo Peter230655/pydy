@@ -13,7 +13,8 @@ from .system import System
 
 
 def multi_mass_spring_damper(n=1, apply_gravity=False,
-                             apply_external_forces=False):
+                             apply_external_forces=False,
+                             external_force_as_sin_of_t=False):
     r"""Returns a system containing the symbolic equations of motion and
     associated variables for a simple mutli-degree of freedom point mass,
     spring, damper system with optional gravitational and external
@@ -48,6 +49,8 @@ def multi_mass_spring_damper(n=1, apply_gravity=False,
         If true, gravity will be applied to each mass.
     apply_external_forces : boolean
         If true, a time varying external force will be applied to each mass.
+    external_force_as_sin_of_t : boolean
+        If true, the external forces will each be replaced with sin(t).
 
     Returns
     -------
@@ -64,7 +67,10 @@ def multi_mass_spring_damper(n=1, apply_gravity=False,
 
     coordinates = me.dynamicsymbols('x:{}'.format(n))
     speeds = me.dynamicsymbols('v:{}'.format(n))
-    specifieds = me.dynamicsymbols('f:{}'.format(n))
+    if external_force_as_sin_of_t:
+        specifieds = [sm.sin(me.dynamicsymbols._t) for i in range(n)]
+    else:
+        specifieds = me.dynamicsymbols('f:{}'.format(n))
 
     ceiling = me.ReferenceFrame('N')
     origin = me.Point('origin')

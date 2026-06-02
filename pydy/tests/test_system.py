@@ -233,6 +233,7 @@ class TestSystem():
         # This gets rid of the previous default entries, and should work
         # properly.
         # Also check here that optional arguments can be passed to the solver.
+        # TODO : This may not work with outputs.
         sys.specifieds.pop(spec_syms[0])
         state_traj, infodict = sys.integrate(full_output=True)
 
@@ -1137,3 +1138,31 @@ def test_system_with_noncontributing_forces(plot=False):
             ax.set_ylabel(sm.latex(s, mode='inline'))
 
         plt.show()
+
+
+def test_explicit_time():
+    sys = multi_mass_spring_damper(1, apply_gravity=True,
+                                   apply_external_forces=True,
+                                   external_force_as_sin_of_t=True)
+    constant_map = dict(zip(sm.symbols('m0, k0, c0, g'),
+                            [2.0, 1.5, 0.5, 9.8]))
+    sys.constants = constant_map
+    ts = np.linspace(0.0, 2.0, num=3)
+    xd = sys.evaluate_ode()
+    exp_xd = np.array([0.0, (-0.5*0.0 - 1.5*0.0 + 2.0*9.8)/2.0 +
+                       np.sin(ts[0])/2.0])
+    np.testing.assert_allclose(xd, exp_xd)
+    xds = sys.evaluate_ode(x=np.ones((3, 2)), t=ts)
+    exp_xds = np.array([[1.0, (-0.5*1.0 - 1.5*1.0 + 2.0*9.8)/2.0 +
+                         np.sin(ts[0])/2.0],
+                        [1.0, (-0.5*1.0 - 1.5*1.0 + 2.0*9.8)/2.0 +
+                         np.sin(ts[1])/2.0],
+                        [1.0, (-0.5*1.0 - 1.5*1.0 + 2.0*9.8)/2.0 +
+                         np.sin(ts[2])/2.0]])
+    np.testing.assert_allclose(xds, exp_xds)
+    sys.times = ts
+    xs = sys.integrate()
+    exp_xs = np.array([[ 0.0, 0.0],
+                       [ 4.31701656, 7.82602082],
+                       [13.45662943, 9.24246248]])
+    np.testing.assert_allclose(xs, exp_xs)
